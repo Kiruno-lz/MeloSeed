@@ -2,26 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    /* Light Mode - Warm Milky White */
+    --background: 40 20% 98%; /* #FFFDF8 */
+    --foreground: 240 10% 30%; /* #454554 */
+    
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 30%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 30%;
+    
+    --primary: 265 80% 65%; /* Soft Purple */
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 35 30% 90%; /* Warm Beige */
+    --secondary-foreground: 240 10% 30%;
+    
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 5% 45%;
+    
+    --accent: 265 80% 95%;
+    --accent-foreground: 265 80% 40%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 265 80% 65%;
+    
+    --radius: 1.5rem; /* Very rounded */
+  }
+
+  .dark {
+    /* Dark Mode - Calm Grey-Black */
+    --background: 240 10% 10%; /* #17171C */
+    --foreground: 0 0% 90%;
+    
+    --card: 240 10% 14%; /* #202027 */
+    --card-foreground: 0 0% 90%;
+    
+    --popover: 240 10% 14%;
+    --popover-foreground: 0 0% 90%;
+    
+    --primary: 265 80% 75%; /* Lighter Purple */
+    --primary-foreground: 240 10% 10%;
+    
+    --secondary: 240 10% 20%;
+    --secondary-foreground: 0 0% 90%;
+    
+    --muted: 240 10% 20%;
+    --muted-foreground: 240 5% 65%;
+    
+    --accent: 240 10% 25%;
+    --accent-foreground: 0 0% 90%;
+    
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 10% 20%;
+    --input: 240 10% 20%;
+    --ring: 265 80% 75%;
   }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground transition-colors duration-300;
+  }
 }

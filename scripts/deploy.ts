@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import "@nomicfoundation/hardhat-ethers";
 
 async function main() {
   const MeloSeed = await ethers.getContractFactory("MeloSeed");
