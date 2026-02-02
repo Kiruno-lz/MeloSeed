@@ -1,49 +1,69 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/utils/Base64.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
-contract MeloSeed is ERC721, Ownable {
+contract MeloSeed is ERC1155, ERC1155Burnable, Ownable {
     using Strings for uint256;
 
+    // Counter for new token IDs
     uint256 private _nextTokenId;
 
-    // Mapping from tokenId to audio data (Base64 string)
-    mapping(uint256 => string) public audioData;
-    mapping(uint256 => uint256) public tokenSeeds;
+    // Optional: Mapping to store individual token URIs if they are unique
+    mapping(uint256 => string) private _tokenURIs;
 
-    constructor() ERC721("MeloSeed", "MELO") Ownable(msg.sender) {}
+    // Optional: Name and Symbol (ERC1155 doesn't enforce this but tools like OpenSea use it)
+    string public name = "MeloSeed";
+    string public symbol = "MELO";
 
-    function mint(uint256 seed, string memory _audioBase64) public {
+    constructor() ERC1155("") Ownable(msg.sender) {}
+
+    /**
+     * @dev Mint a new unique music NFT (Edition 1/1 by default, but scalable).
+     * @param account The address to receive the NFT.
+     * @param amount The number of copies (usually 1 for unique generated music).
+     * @param tokenURI The IPFS URI for the metadata.
+     * @param data Additional data.
+     */
+    function mint(
+        address account,
+        uint256 amount,
+        string memory tokenURI,
+        bytes memory data
+    ) public {
         uint256 tokenId = _nextTokenId++;
-        _safeMint(msg.sender, tokenId);
-        
-        audioData[tokenId] = _audioBase64;
-        tokenSeeds[tokenId] = seed;
+        _mint(account, tokenId, amount, data);
+        _setTokenURI(tokenId, tokenURI);
     }
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        _requireOwned(tokenId);
+    /**
+     * @dev Sets `tokenURI` for a specific `tokenId`.
+     */
+    function _setTokenURI(uint256 tokenId, string memory tokenURI) internal {
+        _tokenURIs[tokenId] = tokenURI;
+        emit URI(tokenURI, tokenId);
+    }
 
-        string memory audio = audioData[tokenId];
-        uint256 seed = tokenSeeds[tokenId];
+    /**
+     * @dev Returns the URI for a given token ID.
+     */
+    function uri(uint256 tokenId) public view virtual override returns (string memory) {
+        string memory tokenURI = _tokenURIs[tokenId];
+        
+        // If specific URI is set, return it
+        if (bytes(tokenURI).length > 0) {
+            return tokenURI;
+        }
 
-        string memory json = Base64.encode(
-            bytes(
-                string(
-                    abi.encodePacked(
-                        '{"name": "MeloSeed #', tokenId.toString(), '",',
-                        '"description": "Fully on-chain AI generated music on Monad.",',
-                        '"attributes": [{"trait_type": "Seed", "value": "', seed.toString(), '"}],',
-                        '"animation_url": "data:audio/mp3;base64,', audio, '"}'
-                    )
-                )
-            )
-        );
+        // Fallback to super implementation (which returns the base URI)
+        return super.uri(tokenId);
+    }
 
-        return string(abi.encodePacked("data:application/json;base64,", json));
+    // Function to update metadata if needed (e.g. revealing or fixing IPFS link)
+    function setURI(uint256 tokenId, string memory newuri) public onlyOwner {
+        _setTokenURI(tokenId, newuri);
     }
 }
