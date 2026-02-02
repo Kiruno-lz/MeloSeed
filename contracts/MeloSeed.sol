@@ -2,48 +2,41 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/utils/Base64.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MeloSeed is ERC721, Ownable {
-    using Strings for uint256;
-
+contract MeloSeed is ERC721, ERC721URIStorage, Ownable {
     uint256 private _nextTokenId;
 
-    // Mapping from tokenId to audio data (Base64 string)
-    mapping(uint256 => string) public audioData;
+    // Keep track of seeds for on-chain verification/indexing
     mapping(uint256 => uint256) public tokenSeeds;
 
     constructor() ERC721("MeloSeed", "MELO") Ownable(msg.sender) {}
 
-    function mint(uint256 seed, string memory _audioBase64) public {
+    function mint(uint256 seed, string memory _tokenURI) public {
         uint256 tokenId = _nextTokenId++;
         _safeMint(msg.sender, tokenId);
-        
-        audioData[tokenId] = _audioBase64;
+        _setTokenURI(tokenId, _tokenURI);
         tokenSeeds[tokenId] = seed;
     }
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        _requireOwned(tokenId);
+    // The following functions are overrides required by Solidity.
 
-        string memory audio = audioData[tokenId];
-        uint256 seed = tokenSeeds[tokenId];
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (string memory)
+    {
+        return super.tokenURI(tokenId);
+    }
 
-        string memory json = Base64.encode(
-            bytes(
-                string(
-                    abi.encodePacked(
-                        '{"name": "MeloSeed #', tokenId.toString(), '",',
-                        '"description": "Fully on-chain AI generated music on Monad.",',
-                        '"attributes": [{"trait_type": "Seed", "value": "', seed.toString(), '"}],',
-                        '"animation_url": "data:audio/mp3;base64,', audio, '"}'
-                    )
-                )
-            )
-        );
-
-        return string(abi.encodePacked("data:application/json;base64,", json));
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
     }
 }

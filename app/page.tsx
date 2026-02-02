@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Music, Wallet, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { uploadFileToIPFS, uploadJSONToIPFS, base64ToBlob } from '@/lib/ipfs-client';
 
 const CONTRACT_ADDRESS = '0x721Be852Eaa529daFe9845eC1B8e150Df1aBBe95';
 
@@ -16,7 +17,7 @@ const MELO_SEED_ABI = [
   {
     inputs: [
       { internalType: 'uint256', name: 'seed', type: 'uint256' },
-      { internalType: 'string', name: '_audioBase64', type: 'string' },
+      { internalType: 'string', name: '_tokenURI', type: 'string' },
     ],
     name: 'mint',
     outputs: [],
@@ -35,8 +36,11 @@ const MELO_SEED_ABI = [
 export default function Home() {
   const { address, isConnected } = useAccount();
   const [generatedData, setGeneratedData] = useState<{ seed: number; audioBase64: string } | null>(null);
-  const { writeContract, isPending, error, isSuccess } = useWriteContract();
+  const [isUploading, setIsUploading] = useState(false);
+  const { writeContract, isPending: isTxPending, error, isSuccess } = useWriteContract();
   const { showToast } = useToast();
+
+  const isPending = isUploading || isTxPending;
 
   // Check if user has NFTs
   const { data: balance } = useReadContract({
@@ -66,23 +70,42 @@ export default function Home() {
     }
   }, [isSuccess, showToast]);
 
-  const handleMint = () => {
+  const handleMint = async () => {
     if (!generatedData) return;
 
-    const sizeInBytes = (generatedData.audioBase64.length * 3) / 4;
-    const sizeInKB = sizeInBytes / 1024;
+    // Remove old size check or update it to be more generous since we are using IPFS
+    // But keeping a check is still good practice, though 90KB is irrelevant for IPFS.
+    // Let's just remove the strict check or increase it significantly if needed.
     
-    if (sizeInKB > 90) {
-      showToast(`Audio file too large (${sizeInKB.toFixed(2)} KB). Limit ~90KB.`, 'error');
-      return;
-    }
+    setIsUploading(true);
+    try {
+        // 1. Upload Audio
+        const audioBlob = base64ToBlob(generatedData.audioBase64);
+        const audioURI = await uploadFileToIPFS(audioBlob);
 
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: MELO_SEED_ABI,
-      functionName: 'mint',
-      args: [BigInt(generatedData.seed), generatedData.audioBase64],
-    });
+        // 2. Upload Metadata
+        const metadata = {
+            name: `MeloSeed #${generatedData.seed}`,
+            description: "AI generated music on Monad, stored on decentralized storage.", 
+            // We can add a default image here if we want
+            animation_url: audioURI,
+            attributes: [{ trait_type: "Seed", value: generatedData.seed.toString() }]
+        };
+        const tokenURI = await uploadJSONToIPFS(metadata);
+
+        // 3. Mint
+        writeContract({
+            address: CONTRACT_ADDRESS,
+            abi: MELO_SEED_ABI,
+            functionName: 'mint',
+            args: [BigInt(generatedData.seed), tokenURI],
+        });
+    } catch (e) {
+        console.error(e);
+        showToast("Upload failed: " + (e as Error).message, 'error');
+    } finally {
+        setIsUploading(false);
+    }
   };
 
   if (!isConnected) {
@@ -210,7 +233,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 w-full max-w-4xl text-left">
             {[
                 { title: "AI Generation", desc: "Create unique chiptune/lo-fi melodies from random seeds." },
-                { title: "On-Chain Storage", desc: "Music is stored 100% on the blockchain, not IPFS." },
+                { title: "Decentralized Storage", desc: "Music is stored permanently on IPFS/Arweave." },
                 { title: "NFT Ownership", desc: "Trade and collect your generated musical seeds." }
             ].map((feature, i) => (
                 <Card key={i} className="bg-card/50 border-border/50 backdrop-blur-sm">
@@ -269,9 +292,9 @@ export default function Home() {
                             size="lg"
                         >
                             {isPending ? (
-                                <>Processing Transaction...</>
+                                <>{isUploading ? 'Uploading to IPFS...' : 'Processing Transaction...'}</>
                             ) : (
-                                <>Mint NFT (On-Chain)</>
+                                <>Mint NFT</>
                             )}
                         </Button>
                     </CardContent>
