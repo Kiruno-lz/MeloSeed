@@ -66,7 +66,7 @@ export class ReplicateAdapter implements IMusicGenerator {
 
           ffmpeg(musicPath)
             .setStartTime(0)
-            .setDuration(10) // 10 seconds
+            .setDuration(6) // 10 seconds
             .audioCodec('libmp3lame')
             .audioBitrate(32) // 32kbps
             .audioChannels(1) // Mono
