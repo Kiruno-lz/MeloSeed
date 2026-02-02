@@ -36,6 +36,10 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Temporary files
+# Vercel
+.vercel
+.vercel_tmp
+
+
 tmp/
 temp/
