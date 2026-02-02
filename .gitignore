@@ -38,6 +38,8 @@ Thumbs.db
 
 # Vercel
 .vercel
+.vercel_tmp
+
 
 tmp/
 temp/
