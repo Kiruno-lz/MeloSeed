@@ -7,11 +7,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlayCircle, Search, Disc, AlertCircle, Flame, Trash2 } from 'lucide-react';
+import { PlayCircle, Search, Disc, AlertCircle, Flame, Trash2, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/Toast';
+import * as Popover from '@radix-ui/react-popover';
 
 // Contract address - make sure this matches page.tsx
-const CONTRACT_ADDRESS = '0x9EfB4ecDE9dafe50f8B9a04ADDA75B6C93Fc4c69';
+const CONTRACT_ADDRESS = '0xDfF0D0b3a294e22F86A99dD2DdE1d7810ab5Ca00';
 
 const MELO_SEED_ABI = [
   {
@@ -34,12 +35,17 @@ const MELO_SEED_ABI = [
   }
 ] as const;
 
-export function NFTPlayer() {
+interface NFTPlayerProps {
+    collectionIds?: bigint[];
+}
+
+export function NFTPlayer({ collectionIds = [] }: NFTPlayerProps) {
   const config = useConfig();
   const { address } = useAccount();
   const [tokenId, setTokenId] = useState<string>('');
   const [queryState, setQueryState] = useState<{ id: bigint | null, attempts: number }>({ id: null, attempts: 0 });
   const [displayError, setDisplayError] = useState<string | null>(null);
+  const [openCombobox, setOpenCombobox] = useState(false);
   
   const { writeContract, isPending: isBurning, isSuccess: isBurnSuccess, error: burnError } = useWriteContract();
   const { showToast } = useToast();
@@ -144,10 +150,6 @@ export function NFTPlayer() {
     });
   };
 
-  // Removed manual tokenURI parsing logic since it is now in fetchTokenURI
-  // let audioSrc = null;
-  // let metadata = null;
-  // let coverImage = null;
   // The useQuery 'data' is now the parsed metadata object
   const nftData = metadata as any; // Quick fix for type
   const audioSrc = nftData?.animation_url;
@@ -161,21 +163,58 @@ export function NFTPlayer() {
           Play On-Chain NFT
         </CardTitle>
         <CardDescription>
-          Enter a Token ID to load and play music directly from the blockchain.
+          Select from your collection or enter a Token ID manually.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            placeholder="Token ID (e.g. 0)"
-            value={tokenId}
-            onChange={(e) => {
-                setTokenId(e.target.value);
-                if (displayError) setDisplayError(null);
-            }}
-            className="flex-1"
-          />
+        
+        {/* Search / Select Control */}
+        <div className="flex gap-2 relative">
+            <div className="flex-1 relative">
+                <Input
+                    type="number"
+                    placeholder="Token ID (e.g. 0)"
+                    value={tokenId}
+                    onChange={(e) => {
+                        setTokenId(e.target.value);
+                        if (displayError) setDisplayError(null);
+                    }}
+                    className="w-full pr-8"
+                />
+                
+                {/* Dropdown Trigger for Collection */}
+                {collectionIds.length > 0 && (
+                    <Popover.Root open={openCombobox} onOpenChange={setOpenCombobox}>
+                        <Popover.Trigger asChild>
+                            <button 
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                                onClick={() => setOpenCombobox(!openCombobox)}
+                            >
+                                <ChevronDown className="w-4 h-4" />
+                            </button>
+                        </Popover.Trigger>
+                        <Popover.Content className="w-[200px] p-1 bg-popover border rounded-md shadow-md z-50 max-h-[200px] overflow-y-auto" align="end">
+                            <div className="text-xs font-semibold px-2 py-1.5 text-muted-foreground">Your Collection</div>
+                            {collectionIds.map(id => (
+                                <button
+                                    key={id.toString()}
+                                    className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm cursor-pointer"
+                                    onClick={() => {
+                                        setTokenId(id.toString());
+                                        setOpenCombobox(false);
+                                        // Auto trigger search
+                                        setQueryState({ id, attempts: 0 });
+                                        setDisplayError(null);
+                                    }}
+                                >
+                                    Token #{id.toString()}
+                                </button>
+                            ))}
+                        </Popover.Content>
+                    </Popover.Root>
+                )}
+            </div>
+
           <Button
             onClick={handleSearch}
             disabled={isFetching}

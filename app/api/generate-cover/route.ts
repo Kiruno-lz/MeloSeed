@@ -1,28 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
+import Replicate from 'replicate';
 
 export async function POST(req: NextRequest) {
   try {
-    // In a real application, we would use an AI model (e.g., Replicate, OpenAI DALL-E) here.
-    // For now, we return a static placeholder image as requested.
+    const { prompt } = await req.json().catch(() => ({ prompt: null }));
     
-    // Simulating delay for "generation"
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Default prompt if none provided
+    const imagePrompt = prompt || "A futuristic abstract visualization of music, digital art, vibrant colors, high quality, 4k";
 
-    // Since we are running locally/dev, we need the absolute URL or a relative path that works.
-    // If we want to mint this as an NFT, we ideally need to upload this image to IPFS first,
-    // or return a public URL.
+    // 1. Try Replicate if API Token is available
+    if (process.env.REPLICATE_API_TOKEN) {
+        try {
+            const replicate = new Replicate({
+                auth: process.env.REPLICATE_API_TOKEN,
+            });
+
+            // Using Stable Diffusion XL (faster and cheaper)
+            const output = await replicate.run(
+                "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+                {
+                    input: {
+                        prompt: imagePrompt,
+                        width: 768,
+                        height: 768,
+                        refine: "expert_ensemble_refiner",
+                    }
+                }
+            );
+
+            // Output is usually an array of URLs
+            if (Array.isArray(output) && output.length > 0) {
+                return NextResponse.json({ 
+                    url: output[0],
+                    provider: 'replicate'
+                });
+            }
+        } catch (replicateError) {
+            console.warn("Replicate generation failed, falling back to mock:", replicateError);
+            // Continue to fallback
+        }
+    }
+
+    // 2. Fallback: Local Test Image (Mock)
+    // Simulating delay
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     
-    // For the MVP requirement "use local test.png", we can just return the path.
-    // However, to be "mintable", this usually needs to be on IPFS.
-    // But the user just asked for the "API to generate it".
-    
-    // Let's assume the frontend will handle the IPFS upload of this "generated" image,
-    // OR we return a pre-uploaded IPFS hash if we wanted to be fancy.
-    // But let's stick to the requirement: "use local test.png".
-    
+    // We return the local path. 
+    // NOTE: In a real "burn" scenario where we need to upload to IPFS, 
+    // the frontend handles fetching this URL (even if local) and uploading the Blob.
     return NextResponse.json({ 
       url: '/test.png',
-      prompt: 'A unique abstract visualization of the melody.' 
+      provider: 'local-mock',
+      prompt: imagePrompt
     });
 
   } catch (error) {

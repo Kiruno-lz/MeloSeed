@@ -13,8 +13,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Music, Wallet, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { uploadFileToIPFS, uploadJSONToIPFS, base64ToBlob } from '@/lib/ipfs-client';
+import { useMyCollection } from '@/hooks/useMyCollection';
 
-const CONTRACT_ADDRESS = '0x9EfB4ecDE9dafe50f8B9a04ADDA75B6C93Fc4c69';
+const CONTRACT_ADDRESS = '0xDfF0D0b3a294e22F86A99dD2DdE1d7810ab5Ca00';
 
 const MELO_SEED_ABI = [
   {
@@ -45,6 +46,7 @@ export default function Home() {
   // New state for custom metadata
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   // Update title when seed changes
@@ -55,6 +57,7 @@ export default function Home() {
         // Or simpler: just always reset it when generatedData changes.
         setTitle(`MeloSeed #${generatedData.seed}`);
         setDescription(`A unique AI-generated melody seeded by ${generatedData.seed}.`);
+        setCoverUrl(null); // Reset cover
         
         // Trigger cover generation
         generateCover();
@@ -64,12 +67,13 @@ export default function Home() {
   const generateCover = async () => {
       try {
           // Call our new API
-          const res = await fetch('/api/generate-cover', { method: 'POST' });
+          const res = await fetch('/api/generate-cover', { 
+            method: 'POST',
+            body: JSON.stringify({ prompt: `Abstract visualization of music seed ${generatedData?.seed}` })
+          });
           if (res.ok) {
               const data = await res.json();
-              // In a real app, we might display this image to the user
-              // For now, we just know it's available at data.url
-              // We'll use it during minting
+              setCoverUrl(data.url);
           }
       } catch (e) {
           console.error("Cover generation failed", e);
@@ -79,25 +83,10 @@ export default function Home() {
   const { writeContract, isPending: isTxPending, error, isSuccess } = useWriteContract();
   const { showToast } = useToast();
 
+  // My Collection Hook
+  const { tokenIds, isLoading: isCollectionLoading, refetch: refetchCollection } = useMyCollection(CONTRACT_ADDRESS);
+
   const isPending = isUploading || isTxPending;
-
-  // Since ERC1155 balanceOf requires an ID, and we don't know the ID ahead of time (it's incremental),
-  // we can't easily check "balanceOf" for a general "has NFTs" check without an indexer or knowing IDs.
-  // For now, we will skip the "hasNFTs" check or use a simpler assumption (e.g. check ID 0, 1, 2 if feasible, or just remove the check).
-  // Or better, we can read the `_nextTokenId` from contract if we made it public, but it's private.
-  // We'll skip the collection display for this refactor as it requires an indexer (The Graph) for dynamic ERC1155 tokens.
-   // const hasNFTs = false; 
-
-   useEffect(() => {
-     if (generatedData) {
-         setTitle(`MeloSeed #${generatedData.seed}`);
-         setDescription(`A unique AI-generated melody seeded by ${generatedData.seed}.`);
-         
-         // Trigger cover generation
-         generateCover();
-     }
-   }, [generatedData]);
-
 
   useEffect(() => {
     if (error) {
@@ -111,8 +100,11 @@ export default function Home() {
     if (isSuccess) {
       showToast('NFT Minted Successfully!', 'success');
       setGeneratedData(null); // Reset after success
+      setCoverUrl(null);
+      // Wait a bit for indexing? Event listeners are usually fast on devnet
+      setTimeout(() => refetchCollection(), 2000);
     }
-  }, [isSuccess, showToast]);
+  }, [isSuccess, showToast, refetchCollection]);
 
   const handleMint = async () => {
     if (!generatedData || !address) return;
@@ -124,17 +116,26 @@ export default function Home() {
         const audioURI = await uploadFileToIPFS(audioBlob);
 
         // 2. Upload Cover Image (Placeholder for now)
-         // We call the API again or just use the known path. 
-         // Since the API returns a local path "/test.png", we need to decide:
-         // Do we upload "test.png" to IPFS? Or do we use the public URL?
-         // For a "permanent" NFT, we should upload it.
-         
-         // Let's fetch the file from our own API/public folder and upload it to IPFS.
-         const coverRes = await fetch('/test.png');
-         const coverBlob = await coverRes.blob();
-         const imageURI = await uploadFileToIPFS(coverBlob); // Upload local test.png to IPFS
+          // We call the API again or just use the known path. 
+          // Since the API returns a local path "/test.png", we need to decide:
+          // Do we upload "test.png" to IPFS? Or do we use the public URL?
+          // For a "permanent" NFT, we should upload it.
+          
+          let imageURI = "";
+          if (coverUrl) {
+              // If it's a remote URL (Replicate), fetch it.
+              // If it's local (/test.png), fetch it relative.
+              const coverRes = await fetch(coverUrl);
+              const coverBlob = await coverRes.blob();
+              imageURI = await uploadFileToIPFS(coverBlob);
+          } else {
+               // Fallback
+              const coverRes = await fetch('/test.png');
+              const coverBlob = await coverRes.blob();
+              imageURI = await uploadFileToIPFS(coverBlob); 
+          }
 
-         // 3. Upload Metadata
+          // 3. Upload Metadata
         const metadata = {
             name: title,
             description: description, 
@@ -335,11 +336,27 @@ export default function Home() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="bg-muted p-4 rounded-xl text-center">
-                            <audio controls src={`data:audio/mp3;base64,${generatedData.audioBase64}`} className="w-full" />
-                            <p className="text-xs text-muted-foreground mt-2">
-                                Size: {((generatedData.audioBase64.length * 3) / 4 / 1024).toFixed(2)} KB
-                            </p>
+                        <div className="bg-muted p-4 rounded-xl text-center relative overflow-hidden group">
+                            {/* Display Cover if available */}
+                            {coverUrl && (
+                                <div className="absolute inset-0 z-0 opacity-20">
+                                    <img src={coverUrl} alt="Cover" className="w-full h-full object-cover blur-sm" />
+                                </div>
+                            )}
+                            
+                            <div className="relative z-10">
+                                {coverUrl ? (
+                                    <img src={coverUrl} alt="Cover" className="w-32 h-32 mx-auto rounded-lg mb-4 shadow-lg object-cover" />
+                                ) : (
+                                    <div className="w-32 h-32 mx-auto rounded-lg mb-4 bg-primary/20 flex items-center justify-center">
+                                        <Music className="w-12 h-12 text-primary/50 animate-pulse" />
+                                    </div>
+                                )}
+                                <audio controls src={`data:audio/mp3;base64,${generatedData.audioBase64}`} className="w-full" />
+                                <p className="text-xs text-muted-foreground mt-2">
+                                    Size: {((generatedData.audioBase64.length * 3) / 4 / 1024).toFixed(2)} KB
+                                </p>
+                            </div>
                         </div>
                         
                         <div className="space-y-3">
@@ -392,10 +409,15 @@ export default function Home() {
         <div className="w-full max-w-2xl mt-12 pt-12 border-t border-border/50 animate-in fade-in">
              <div className="flex flex-col items-center gap-6">
                 <div className="text-center space-y-1">
-                    <h3 className="text-2xl font-bold">NFT Player & Burner</h3>
-                    <p className="text-sm text-muted-foreground">Play your minted music or burn tokens.</p>
+                    <h3 className="text-2xl font-bold">Your Collection</h3>
+                    <p className="text-sm text-muted-foreground">
+                        {isCollectionLoading ? 'Loading collection...' : 
+                         tokenIds.length > 0 ? `You own ${tokenIds.length} MeloSeeds.` : 'No MeloSeeds found.'}
+                    </p>
                 </div>
-                <NFTPlayer />
+                
+                {/* Display list of IDs to play */}
+                <NFTPlayer collectionIds={tokenIds} />
              </div>
         </div>
     </div>
