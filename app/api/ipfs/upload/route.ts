@@ -13,14 +13,17 @@ export async function POST(req: NextRequest) {
 
     if (!pinataJWT) {
       console.error('PINATA_JWT is not set');
-      // For development/demo purposes without keys, we might return a mock hash or fail.
-      // Failing is better so the user knows they need keys.
       return NextResponse.json({ error: 'Server configuration error: PINATA_JWT not set' }, { status: 500 });
     }
 
     const uploadData = new FormData();
     uploadData.append('file', file);
-    // Optional: Add pinataMetadata or pinataOptions if needed
+    
+    // Add optional metadata if needed, e.g.
+    // const metadata = JSON.stringify({ name: (file as File).name });
+    // uploadData.append('pinataMetadata', metadata);
+    // const options = JSON.stringify({ cidVersion: 0 });
+    // uploadData.append('pinataOptions', options);
 
     const res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
       method: 'POST',

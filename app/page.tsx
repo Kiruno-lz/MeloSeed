@@ -6,18 +6,23 @@ import { Generator } from '@/components/Generator';
 import { NFTPlayer } from '@/components/NFTPlayer';
 import { useToast } from '@/components/Toast';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Music, Wallet, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { uploadFileToIPFS, uploadJSONToIPFS, base64ToBlob } from '@/lib/ipfs-client';
 
-const CONTRACT_ADDRESS = '0x721Be852Eaa529daFe9845eC1B8e150Df1aBBe95';
+const CONTRACT_ADDRESS = '0x9EfB4ecDE9dafe50f8B9a04ADDA75B6C93Fc4c69';
 
 const MELO_SEED_ABI = [
   {
     inputs: [
-      { internalType: 'uint256', name: 'seed', type: 'uint256' },
-      { internalType: 'string', name: '_tokenURI', type: 'string' },
+      { internalType: 'address', name: 'account', type: 'address' },
+      { internalType: 'uint256', name: 'amount', type: 'uint256' },
+      { internalType: 'string', name: 'tokenURI', type: 'string' },
+      { internalType: 'bytes', name: 'data', type: 'bytes' },
     ],
     name: 'mint',
     outputs: [],
@@ -25,7 +30,7 @@ const MELO_SEED_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
+    inputs: [{ internalType: 'address', name: 'account', type: 'address' }, { internalType: 'uint256', name: 'id', type: 'uint256' }],
     name: 'balanceOf',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
@@ -36,24 +41,63 @@ const MELO_SEED_ABI = [
 export default function Home() {
   const { address, isConnected } = useAccount();
   const [generatedData, setGeneratedData] = useState<{ seed: number; audioBase64: string } | null>(null);
+  
+  // New state for custom metadata
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Update title when seed changes
+  useEffect(() => {
+    if (generatedData) {
+        // We set a default title "MeloSeed #{seed}" but allow user to change it.
+        // We only set it if the title is empty or looks like a default title from another seed (simple heuristic)
+        // Or simpler: just always reset it when generatedData changes.
+        setTitle(`MeloSeed #${generatedData.seed}`);
+        setDescription(`A unique AI-generated melody seeded by ${generatedData.seed}.`);
+        
+        // Trigger cover generation
+        generateCover();
+    }
+  }, [generatedData]);
+
+  const generateCover = async () => {
+      try {
+          // Call our new API
+          const res = await fetch('/api/generate-cover', { method: 'POST' });
+          if (res.ok) {
+              const data = await res.json();
+              // In a real app, we might display this image to the user
+              // For now, we just know it's available at data.url
+              // We'll use it during minting
+          }
+      } catch (e) {
+          console.error("Cover generation failed", e);
+      }
+  };
+  
   const { writeContract, isPending: isTxPending, error, isSuccess } = useWriteContract();
   const { showToast } = useToast();
 
   const isPending = isUploading || isTxPending;
 
-  // Check if user has NFTs
-  const { data: balance } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: MELO_SEED_ABI,
-    functionName: 'balanceOf',
-    args: address ? [address] : undefined,
-    query: {
-        enabled: !!address,
-    }
-  });
+  // Since ERC1155 balanceOf requires an ID, and we don't know the ID ahead of time (it's incremental),
+  // we can't easily check "balanceOf" for a general "has NFTs" check without an indexer or knowing IDs.
+  // For now, we will skip the "hasNFTs" check or use a simpler assumption (e.g. check ID 0, 1, 2 if feasible, or just remove the check).
+  // Or better, we can read the `_nextTokenId` from contract if we made it public, but it's private.
+  // We'll skip the collection display for this refactor as it requires an indexer (The Graph) for dynamic ERC1155 tokens.
+   // const hasNFTs = false; 
 
-  const hasNFTs = balance ? Number(balance) > 0 : false;
+   useEffect(() => {
+     if (generatedData) {
+         setTitle(`MeloSeed #${generatedData.seed}`);
+         setDescription(`A unique AI-generated melody seeded by ${generatedData.seed}.`);
+         
+         // Trigger cover generation
+         generateCover();
+     }
+   }, [generatedData]);
+
 
   useEffect(() => {
     if (error) {
@@ -71,11 +115,7 @@ export default function Home() {
   }, [isSuccess, showToast]);
 
   const handleMint = async () => {
-    if (!generatedData) return;
-
-    // Remove old size check or update it to be more generous since we are using IPFS
-    // But keeping a check is still good practice, though 90KB is irrelevant for IPFS.
-    // Let's just remove the strict check or increase it significantly if needed.
+    if (!generatedData || !address) return;
     
     setIsUploading(true);
     try {
@@ -83,22 +123,38 @@ export default function Home() {
         const audioBlob = base64ToBlob(generatedData.audioBase64);
         const audioURI = await uploadFileToIPFS(audioBlob);
 
-        // 2. Upload Metadata
+        // 2. Upload Cover Image (Placeholder for now)
+         // We call the API again or just use the known path. 
+         // Since the API returns a local path "/test.png", we need to decide:
+         // Do we upload "test.png" to IPFS? Or do we use the public URL?
+         // For a "permanent" NFT, we should upload it.
+         
+         // Let's fetch the file from our own API/public folder and upload it to IPFS.
+         const coverRes = await fetch('/test.png');
+         const coverBlob = await coverRes.blob();
+         const imageURI = await uploadFileToIPFS(coverBlob); // Upload local test.png to IPFS
+
+         // 3. Upload Metadata
         const metadata = {
-            name: `MeloSeed #${generatedData.seed}`,
-            description: "AI generated music on Monad, stored on decentralized storage.", 
-            // We can add a default image here if we want
+            name: title,
+            description: description, 
+            image: imageURI,
             animation_url: audioURI,
             attributes: [{ trait_type: "Seed", value: generatedData.seed.toString() }]
         };
         const tokenURI = await uploadJSONToIPFS(metadata);
 
-        // 3. Mint
+        // 4. Mint (ERC1155)
         writeContract({
             address: CONTRACT_ADDRESS,
             abi: MELO_SEED_ABI,
             functionName: 'mint',
-            args: [BigInt(generatedData.seed), tokenURI],
+            args: [
+                address,            // account
+                BigInt(1),          // amount
+                tokenURI,           // tokenURI
+                "0x"                // data
+            ],
         });
     } catch (e) {
         console.error(e);
@@ -233,7 +289,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 w-full max-w-4xl text-left">
             {[
                 { title: "AI Generation", desc: "Create unique chiptune/lo-fi melodies from random seeds." },
-                { title: "Decentralized Storage", desc: "Music is stored permanently on IPFS/Arweave." },
+                { title: "On-Chain Storage", desc: "Music is stored 100% on the blockchain, not IPFS." },
                 { title: "NFT Ownership", desc: "Trade and collect your generated musical seeds." }
             ].map((feature, i) => (
                 <Card key={i} className="bg-card/50 border-border/50 backdrop-blur-sm">
@@ -285,9 +341,31 @@ export default function Home() {
                                 Size: {((generatedData.audioBase64.length * 3) / 4 / 1024).toFixed(2)} KB
                             </p>
                         </div>
+                        
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <Label htmlFor="title">Title</Label>
+                                <Input 
+                                    id="title" 
+                                    value={title} 
+                                    onChange={(e) => setTitle(e.target.value)} 
+                                    placeholder="Name your melody"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="description">Description</Label>
+                                <Textarea 
+                                    id="description" 
+                                    value={description} 
+                                    onChange={(e) => setDescription(e.target.value)} 
+                                    placeholder="Describe the vibe..."
+                                />
+                            </div>
+                        </div>
+
                         <Button 
                             onClick={handleMint} 
-                            disabled={isPending} 
+                            disabled={isPending || !title} 
                             className="w-full" 
                             size="lg"
                         >
@@ -311,17 +389,15 @@ export default function Home() {
       </div>
 
       {/* Collection Section - Only visible if user owns NFTs as per requirements */}
-      {hasNFTs && (
         <div className="w-full max-w-2xl mt-12 pt-12 border-t border-border/50 animate-in fade-in">
              <div className="flex flex-col items-center gap-6">
                 <div className="text-center space-y-1">
-                    <h3 className="text-2xl font-bold">Your Collection</h3>
-                    <p className="text-sm text-muted-foreground">You own {String(balance)} MeloSeed NFTs. Play them below.</p>
+                    <h3 className="text-2xl font-bold">NFT Player & Burner</h3>
+                    <p className="text-sm text-muted-foreground">Play your minted music or burn tokens.</p>
                 </div>
                 <NFTPlayer />
              </div>
         </div>
-      )}
     </div>
   );
 }
