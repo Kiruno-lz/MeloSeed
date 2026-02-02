@@ -47,6 +47,35 @@ export default function Home() {
   const [description, setDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   
+  // Update title when seed changes
+  useEffect(() => {
+    if (generatedData) {
+        // We set a default title "MeloSeed #{seed}" but allow user to change it.
+        // We only set it if the title is empty or looks like a default title from another seed (simple heuristic)
+        // Or simpler: just always reset it when generatedData changes.
+        setTitle(`MeloSeed #${generatedData.seed}`);
+        setDescription(`A unique AI-generated melody seeded by ${generatedData.seed}.`);
+        
+        // Trigger cover generation
+        generateCover();
+    }
+  }, [generatedData]);
+
+  const generateCover = async () => {
+      try {
+          // Call our new API
+          const res = await fetch('/api/generate-cover', { method: 'POST' });
+          if (res.ok) {
+              const data = await res.json();
+              // In a real app, we might display this image to the user
+              // For now, we just know it's available at data.url
+              // We'll use it during minting
+          }
+      } catch (e) {
+          console.error("Cover generation failed", e);
+      }
+  };
+  
   const { writeContract, isPending: isTxPending, error, isSuccess } = useWriteContract();
   const { showToast } = useToast();
 
@@ -57,14 +86,17 @@ export default function Home() {
   // For now, we will skip the "hasNFTs" check or use a simpler assumption (e.g. check ID 0, 1, 2 if feasible, or just remove the check).
   // Or better, we can read the `_nextTokenId` from contract if we made it public, but it's private.
   // We'll skip the collection display for this refactor as it requires an indexer (The Graph) for dynamic ERC1155 tokens.
-  const hasNFTs = false; 
+   // const hasNFTs = false; 
 
-  useEffect(() => {
-    if (generatedData) {
-        setTitle(`MeloSeed #${generatedData.seed}`);
-        setDescription(`A unique AI-generated melody seeded by ${generatedData.seed}.`);
-    }
-  }, [generatedData]);
+   useEffect(() => {
+     if (generatedData) {
+         setTitle(`MeloSeed #${generatedData.seed}`);
+         setDescription(`A unique AI-generated melody seeded by ${generatedData.seed}.`);
+         
+         // Trigger cover generation
+         generateCover();
+     }
+   }, [generatedData]);
 
 
   useEffect(() => {
@@ -92,13 +124,17 @@ export default function Home() {
         const audioURI = await uploadFileToIPFS(audioBlob);
 
         // 2. Upload Cover Image (Placeholder for now)
-        // In a real app, we would upload the generated cover or user input
-        // For now, we use a static IPFS hash or public URL for the "test.png" equivalent
-        // Or we can fetch the local test.png and upload it if needed.
-        // Let's assume a default cover for now to save time, or use a placeholder service.
-        const imageURI = "https://ipfs.io/ipfs/QmZg7M9...Placeholder"; // Replace with actual hash after first upload or use a constant
+         // We call the API again or just use the known path. 
+         // Since the API returns a local path "/test.png", we need to decide:
+         // Do we upload "test.png" to IPFS? Or do we use the public URL?
+         // For a "permanent" NFT, we should upload it.
+         
+         // Let's fetch the file from our own API/public folder and upload it to IPFS.
+         const coverRes = await fetch('/test.png');
+         const coverBlob = await coverRes.blob();
+         const imageURI = await uploadFileToIPFS(coverBlob); // Upload local test.png to IPFS
 
-        // 3. Upload Metadata
+         // 3. Upload Metadata
         const metadata = {
             name: title,
             description: description, 
@@ -353,19 +389,15 @@ export default function Home() {
       </div>
 
       {/* Collection Section - Only visible if user owns NFTs as per requirements */}
-      {/* 
-      {hasNFTs && (
         <div className="w-full max-w-2xl mt-12 pt-12 border-t border-border/50 animate-in fade-in">
              <div className="flex flex-col items-center gap-6">
                 <div className="text-center space-y-1">
-                    <h3 className="text-2xl font-bold">Your Collection</h3>
-                    <p className="text-sm text-muted-foreground">You own {String(balance)} MeloSeed NFTs. Play them below.</p>
+                    <h3 className="text-2xl font-bold">NFT Player & Burner</h3>
+                    <p className="text-sm text-muted-foreground">Play your minted music or burn tokens.</p>
                 </div>
                 <NFTPlayer />
              </div>
         </div>
-      )} 
-      */}
     </div>
   );
 }
