@@ -1,10 +1,11 @@
 'use client';
 
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
 import { Generator } from '@/components/Generator';
 import { NFTPlayer } from '@/components/NFTPlayer';
+import { useToast } from '@/components/Toast';
 
 const CONTRACT_ADDRESS = '0x721Be852Eaa529daFe9845eC1B8e150Df1aBBe95';
 
@@ -24,7 +25,23 @@ const MELO_SEED_ABI = [
 export default function Home() {
   const { isConnected } = useAccount();
   const [generatedData, setGeneratedData] = useState<{ seed: number; audioBase64: string } | null>(null);
-  const { writeContract, isPending, error } = useWriteContract();
+  const { writeContract, isPending, error, isSuccess } = useWriteContract();
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    if (error) {
+      console.error("Mint Error:", error);
+      // Extract short error message if possible, otherwise use full message but truncated for UI
+      const msg = error.message.length > 100 ? error.message.substring(0, 100) + '...' : error.message;
+      showToast(msg, 'error');
+    }
+  }, [error, showToast]);
+
+  useEffect(() => {
+    if (isSuccess) {
+      showToast('NFT Minted Successfully!', 'success');
+    }
+  }, [isSuccess, showToast]);
 
   const handleMint = () => {
     if (!generatedData) return;
@@ -35,7 +52,7 @@ export default function Home() {
     console.log(`Payload size: ${sizeInKB.toFixed(2)} KB`);
 
     if (sizeInKB > 90) {
-      alert(`Audio file is too large for on-chain storage (${sizeInKB.toFixed(2)} KB). Limit is ~90KB.`);
+      showToast(`Audio file too large (${sizeInKB.toFixed(2)} KB). Limit ~90KB.`, 'error');
       return;
     }
 
@@ -87,9 +104,6 @@ export default function Home() {
                 >
                   {isPending ? 'Minting...' : 'Mint NFT (On-Chain Storage)'}
                 </button>
-                {error && (
-                  <p className="text-red-400 text-xs break-words">{error.message}</p>
-                )}
               </div>
             )}
             

@@ -1,5 +1,6 @@
 import './globals.css';
 import { Providers } from './providers';
+import { ToastProvider } from '@/components/Toast';
 
 export const metadata = {
   title: 'MeloSeed - On-Chain AI Music',
@@ -14,7 +15,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </Providers>
       </body>
     </html>
   );
