@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Replicate from 'replicate';
-import fs from 'fs';
-import path from 'path';
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,21 +41,14 @@ export async function POST(req: NextRequest) {
 
     // 2. Fallback: Local Test Images (Mock)
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    // Scan public directory for files starting with 'test'
-    // Note: process.cwd() is the root of the project
-    const publicDir = path.join(process.cwd(), 'public');
-    let testImages: string[] = [];
-    
-    try {
-        const files = fs.readdirSync(publicDir);
-        testImages = files.filter(file => 
-            file.toLowerCase().startsWith('test') && 
-            (file.endsWith('.png') || file.endsWith('.jpg') || file.endsWith('.jpeg') || file.endsWith('.webp'))
-        );
-    } catch (e) {
-        console.error("Failed to read public dir:", e);
-    }
+
+    // Hardcoded list of fallback images to ensure Vercel compatibility
+    // without relying on runtime file system access which can be flaky in serverless
+    const testImages = [
+        'test_1.png',
+        'test_2.jpeg',
+        'test_3.png'
+    ];
 
     // Default fallback if no files found
     let selectedImage = '/logo.png'; 
