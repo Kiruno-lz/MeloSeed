@@ -53,44 +53,17 @@ export class ReplicateAdapter implements IMusicGenerator {
   }
 
   private async getMockAudio(): Promise<ArrayBuffer> {
+      // In Vercel/Serverless environment, we might not have access to ffmpeg.
+      // Simply return the file buffer directly.
       const musicPath = path.join(process.cwd(), 'public', 'assets', 'music_long.mp3');
       console.log("Using local mock audio: public/assets/music_long.mp3");
       
       try {
-        await fs.access(musicPath);
-        
-        return new Promise((resolve, reject) => {
-          const tempDir = os.tmpdir();
-          const id = uuidv4();
-          const outputPath = path.join(tempDir, `${id}_trimmed.mp3`);
-
-          ffmpeg(musicPath)
-            .setStartTime(0)
-            .setDuration(20) // 10 seconds
-            .audioCodec('libmp3lame')
-            .audioBitrate(32) // 32kbps
-            .audioChannels(1) // Mono
-            .format('mp3')
-            .outputOptions('-map_metadata', '-1') // Strip metadata
-            .on('end', async () => {
-              try {
-                const buffer = await fs.readFile(outputPath);
-                await fs.unlink(outputPath).catch(() => {}); // Cleanup
-                resolve(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer);
-              } catch (err) {
-                reject(err);
-              }
-            })
-            .on('error', (err) => {
-              console.error("Error processing mock audio:", err);
-              reject(err);
-            })
-            .save(outputPath);
-        });
-
+        const buffer = await fs.readFile(musicPath);
+        return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
       } catch (e) {
-        console.warn("music_long.mp3 not found, falling back to silent WAV.", e);
-        // Fallback to silent WAV (minimal implementation)
+        console.warn("music_long.mp3 not found or unreadable, falling back to silent buffer.", e);
+        // Fallback to silent buffer (1 second of silence)
         return new ArrayBuffer(1024);
       }
   }
