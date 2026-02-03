@@ -2,29 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
+import { Header } from '@/components/Header';
 import { Generator } from '@/components/features/Generator';
 import { NFTPlayer } from '@/components/features/NFTPlayer';
-import { ConnectWalletView } from '@/components/features/ConnectWalletView';
 import { MintingCard } from '@/components/features/MintingCard';
 import { useToast } from '@/components/Toast';
 import { uploadFileToIPFS, uploadJSONToIPFS, base64ToBlob } from '@/lib/ipfs-client';
 import { useMyCollection } from '@/lib/hooks/useMyCollection';
 import { CONTRACT_ADDRESS, MELO_SEED_ABI } from '@/lib/constants';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
-/**
- * Home Page Component
- * 
- * Orchestrates the main application flow:
- * 1. Wallet Connection (via ConnectWalletView)
- * 2. Music Generation (via Generator)
- * 3. NFT Minting (via MintingCard)
- * 4. Collection Viewing (via NFTPlayer)
- */
 export default function Home() {
   const { address, isConnected } = useAccount();
-  const [generatedData, setGeneratedData] = useState<{ seed: number; audioBase64: string } | null>(null);
+  const [view, setView] = useState<'create' | 'collection'>('create');
   
-  // Metadata State
+  // Generation State
+  const [generatedData, setGeneratedData] = useState<{ seed: number; audioBase64: string } | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -33,7 +26,7 @@ export default function Home() {
   const { writeContract, isPending: isTxPending, error, isSuccess } = useWriteContract();
   const { showToast } = useToast();
 
-  // My Collection Hook
+  // Collection Hook
   const { tokenIds, isLoading: isCollectionLoading, refetch: refetchCollection } = useMyCollection(CONTRACT_ADDRESS);
 
   const isPending = isUploading || isTxPending;
@@ -41,41 +34,41 @@ export default function Home() {
   // Effect: Reset/Default metadata when new music is generated
   useEffect(() => {
     if (generatedData) {
-        setTitle(`MeloSeed #${generatedData.seed}`);
-        setDescription(`A unique AI-generated melody seeded by ${generatedData.seed}.`);
-        setCoverUrl(null); // Reset cover
-        
-        // Trigger cover generation
-        generateCover();
+      setTitle(`MeloSeed #${generatedData.seed}`);
+      setDescription(`A unique AI-generated melody seeded by ${generatedData.seed}.`);
+      setCoverUrl(null); 
+      generateCover(generatedData.seed);
     }
   }, [generatedData]);
 
-  // Effect: Handle Contract Write Error
+  // Effect: Handle Mint Errors
   useEffect(() => {
     if (error) {
       console.error("Mint Error:", error);
-      const msg = error.message.length > 100 ? error.message.substring(0, 100) + '...' : error.message;
-      showToast(msg, 'error');
+      showToast(error.message.substring(0, 100) + '...', 'error');
     }
   }, [error, showToast]);
 
-  // Effect: Handle Contract Write Success
+  // Effect: Handle Mint Success
   useEffect(() => {
     if (isSuccess) {
       showToast('NFT Minted Successfully!', 'success');
-      setGeneratedData(null); // Reset after success
+      setGeneratedData(null); // Reset to allow creating another
       setCoverUrl(null);
-      // Wait a bit for indexing? Event listeners are usually fast on devnet
-      setTimeout(() => refetchCollection(), 2000);
+      // Switch to collection view after a delay
+      setTimeout(() => {
+          refetchCollection();
+          setView('collection');
+      }, 2000);
     }
   }, [isSuccess, showToast, refetchCollection]);
 
-  // Function: Generate AI Cover
-  const generateCover = async () => {
+  // Generate AI Cover
+  const generateCover = async (seed: number) => {
       try {
           const res = await fetch('/api/generate-cover', { 
             method: 'POST',
-            body: JSON.stringify({ prompt: `Abstract visualization of music seed ${generatedData?.seed}` })
+            body: JSON.stringify({ prompt: `Abstract visualization of music seed ${seed}` })
           });
           if (res.ok) {
               const data = await res.json();
@@ -86,30 +79,34 @@ export default function Home() {
       }
   };
 
-  // Function: Handle Mint Process
+  // Handle Mint
   const handleMint = async () => {
-    if (!generatedData || !address) return;
+    if (!generatedData) return;
+    
+    // Check wallet connection ONLY when minting
+    if (!isConnected || !address) {
+        showToast("Please connect your wallet to mint.", "error");
+        // Open connect modal? RainbowKit hook needed for imperative open
+        // For now, user sees the button in header.
+        return;
+    }
     
     setIsUploading(true);
     try {
-        // 1. Upload Audio
         const audioBlob = base64ToBlob(generatedData.audioBase64);
         const audioURI = await uploadFileToIPFS(audioBlob);
 
-        // 2. Upload Cover Image
         let imageURI = "";
         if (coverUrl) {
             const coverRes = await fetch(coverUrl);
             const coverBlob = await coverRes.blob();
             imageURI = await uploadFileToIPFS(coverBlob);
         } else {
-             // Fallback to local test image
-            const coverRes = await fetch('/test.png');
+            const coverRes = await fetch('/test.png'); // Fallback
             const coverBlob = await coverRes.blob();
             imageURI = await uploadFileToIPFS(coverBlob); 
         }
 
-        // 3. Upload Metadata
         const metadata = {
             name: title,
             description: description, 
@@ -119,17 +116,11 @@ export default function Home() {
         };
         const tokenURI = await uploadJSONToIPFS(metadata);
 
-        // 4. Mint (ERC1155)
         writeContract({
             address: CONTRACT_ADDRESS,
             abi: MELO_SEED_ABI,
             functionName: 'mint',
-            args: [
-                address,            // account
-                BigInt(1),          // amount
-                tokenURI,           // tokenURI
-                "0x"                // data
-            ],
+            args: [address, BigInt(1), tokenURI, "0x"],
         });
     } catch (e) {
         console.error(e);
@@ -139,57 +130,100 @@ export default function Home() {
     }
   };
 
-  if (!isConnected) {
-    return <ConnectWalletView />;
-  }
-
   return (
-    <div className="flex flex-col items-center gap-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-      
-      {/* Header / Status */}
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Studio</h2>
-        <p className="text-muted-foreground">
-            Create, Mint, and Listen
-        </p>
-      </div>
+    <div className="min-h-screen pb-20 pt-24 px-4 relative overflow-x-hidden flex flex-col">
+        <Header currentView={view} setView={setView} />
+        
+        <main className="container max-w-6xl mx-auto flex-1 flex flex-col justify-center">
+            
+            {/* VIEW: CREATE */}
+            {view === 'create' && (
+                <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+                    
+                    {!generatedData ? (
+                        /* State 0: Generator Input */
+                        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                            <Generator onGenerated={setGeneratedData} />
+                        </div>
+                    ) : (
+                        /* State 1: Preview & Mint */
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start mt-8">
+                            {/* Left: Preview Player */}
+                            <div className="order-1 lg:col-start-1 lg:row-start-1 w-full">
+                                {generatedData && (
+                                    <NFTPlayer 
+                                        previewData={{
+                                            audioSrc: `data:audio/mp3;base64,${generatedData.audioBase64}`,
+                                            coverImage: coverUrl,
+                                            title: title || `MeloSeed #${generatedData.seed}`,
+                                            description: description,
+                                            seed: generatedData.seed
+                                        }}
+                                        className="sticky top-24"
+                                    />
+                                )}
+                            </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-5xl items-start">
-        {/* Left Column: Generator */}
-        <div className="flex flex-col gap-6 items-center lg:items-end w-full">
-            <Generator onGenerated={setGeneratedData} />
-        </div>
+                            {/* Right: Mint Form */}
+                            <div className="order-2 lg:col-start-2 lg:row-start-1 w-full h-full">
+                                <MintingCard 
+                                    onMint={handleMint}
+                                    isPending={isPending}
+                                    isUploading={isUploading}
+                                    title={title}
+                                    setTitle={setTitle}
+                                    description={description}
+                                    setDescription={setDescription}
+                                    onRegenerate={() => setGeneratedData(null)}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
-        {/* Right Column: Preview & Mint OR Placeholder */}
-        <div className="flex flex-col gap-6 items-center lg:items-start w-full">
-            <MintingCard 
-              generatedData={generatedData}
-              coverUrl={coverUrl}
-              onMint={handleMint}
-              isPending={isPending}
-              isUploading={isUploading}
-              title={title}
-              setTitle={setTitle}
-              description={description}
-              setDescription={setDescription}
-            />
-        </div>
-      </div>
+            {/* VIEW: COLLECTION */}
+            {view === 'collection' && (
+                <div className="animate-in fade-in zoom-in-95 duration-500">
+                    <div className="text-center mb-12 space-y-2">
+                        <h2 className="text-3xl font-bold tracking-tight">Your Sonic Garden</h2>
+                        <p className="text-muted-foreground">
+                            {isCollectionLoading ? "Syncing with blockchain..." : 
+                             isConnected ? `You have harvested ${tokenIds.length} unique seeds.` : "Connect wallet to view your garden."}
+                        </p>
+                    </div>
+                    
+                    {isConnected ? (
+                        <div className="flex justify-center">
+                            <NFTPlayer collectionIds={tokenIds} />
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-20 gap-6 opacity-80">
+                            <p className="text-xl font-medium">Please connect your wallet to enter the garden</p>
+                            <ConnectButton.Custom>
+                                {({ openConnectModal, mounted }) => {
+                                  if (!mounted) return null;
+                                  return (
+                                    <button
+                                      onClick={openConnectModal}
+                                      className="
+                                        relative px-8 py-3 rounded-full text-base font-bold text-white
+                                        bg-gradient-to-r from-primary to-purple-500
+                                        shadow-lg shadow-primary/20
+                                        hover:shadow-primary/40 hover:scale-105 transition-all duration-300
+                                      "
+                                    >
+                                      Connect Wallet
+                                    </button>
+                                  );
+                                }}
+                            </ConnectButton.Custom>
+                        </div>
+                    )}
+                </div>
+            )}
 
-      {/* Collection Section */}
-      <div className="w-full max-w-2xl mt-12 pt-12 border-t border-border/50 animate-in fade-in">
-           <div className="flex flex-col items-center gap-6">
-              <div className="text-center space-y-1">
-                  <h3 className="text-2xl font-bold">Your Collection</h3>
-                  <p className="text-sm text-muted-foreground">
-                      {isCollectionLoading ? 'Loading collection...' : 
-                       tokenIds.length > 0 ? `You own ${tokenIds.length} MeloSeeds.` : 'No MeloSeeds found.'}
-                  </p>
-              </div>
-              
-              <NFTPlayer collectionIds={tokenIds} />
-           </div>
-      </div>
+        </main>
     </div>
   );
 }

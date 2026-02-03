@@ -1,20 +1,14 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Music, ArrowRight, CheckCircle2 } from 'lucide-react';
-
-interface GeneratedData {
-  seed: number;
-  audioBase64: string;
-}
+import { Feather, UploadCloud, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface MintingCardProps {
-  generatedData: GeneratedData | null;
-  coverUrl: string | null;
   onMint: () => void;
   isPending: boolean;
   isUploading: boolean;
@@ -22,109 +16,91 @@ interface MintingCardProps {
   setTitle: (value: string) => void;
   description: string;
   setDescription: (value: string) => void;
+  onRegenerate: () => void; // Allow user to go back
 }
 
-/**
- * MintingCard Component
- * 
- * Displays the interface for minting a generated melody.
- * Shows preview player, cover image, and metadata input fields.
- * Handles the "Ready to Mint" state and the "Empty" state.
- */
 export function MintingCard({
-  generatedData,
-  coverUrl,
   onMint,
   isPending,
   isUploading,
   title,
   setTitle,
   description,
-  setDescription
+  setDescription,
+  onRegenerate
 }: MintingCardProps) {
 
-  if (!generatedData) {
-    return (
-      <div className="hidden lg:flex w-full h-full min-h-[300px] items-center justify-center border-2 border-dashed border-border/50 rounded-3xl p-8 text-muted-foreground bg-card/30">
-        <div className="text-center space-y-2">
-          <ArrowRight className="w-8 h-8 mx-auto opacity-50" />
-          <p>Generate music to enable minting</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <Card className="w-full max-w-md border-primary/50 shadow-xl shadow-primary/10 animate-in fade-in slide-in-from-left-4">
+    <Card className="w-full h-full glass-card border-0 animate-in fade-in slide-in-from-right-8 duration-700">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CheckCircle2 className="w-5 h-5 text-green-500" />
-          Ready to Mint
+        <CardTitle className="flex items-center gap-2 text-2xl">
+          <Feather className="w-6 h-6 text-primary" />
+          Harvest & Preserve
         </CardTitle>
         <CardDescription>
-          Your melody is ready. Preview it and mint it to the blockchain.
+          Immortalize this frequency. Mint your sonic seed as a permanent NFT artifact.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Preview Section */}
-        <div className="bg-muted p-4 rounded-xl text-center relative overflow-hidden group">
-          {/* Background Blur */}
-          {coverUrl && (
-            <div className="absolute inset-0 z-0 opacity-20">
-              <img src={coverUrl} alt="Cover" className="w-full h-full object-cover blur-sm" />
-            </div>
-          )}
-          
-          <div className="relative z-10">
-            {coverUrl ? (
-              <img src={coverUrl} alt="Cover" className="w-32 h-32 mx-auto rounded-lg mb-4 shadow-lg object-cover" />
-            ) : (
-              <div className="w-32 h-32 mx-auto rounded-lg mb-4 bg-primary/20 flex items-center justify-center">
-                <Music className="w-12 h-12 text-primary/50 animate-pulse" />
-              </div>
-            )}
-            <audio controls src={`data:audio/mp3;base64,${generatedData.audioBase64}`} className="w-full" />
-            <p className="text-xs text-muted-foreground mt-2">
-              Size: {((generatedData.audioBase64.length * 3) / 4 / 1024).toFixed(2)} KB
-            </p>
-          </div>
-        </div>
+      <CardContent className="space-y-6">
         
         {/* Metadata Inputs */}
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label htmlFor="title">Title</Label>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="title" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Title</Label>
             <Input 
               id="title" 
               value={title} 
               onChange={(e) => setTitle(e.target.value)} 
-              placeholder="Name your melody"
+              placeholder="Name your melody..."
+              className="bg-secondary/50 border-transparent focus:bg-background transition-all text-lg font-semibold"
             />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="description">Description</Label>
+          <div className="space-y-2">
+            <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description</Label>
             <Textarea 
               id="description" 
               value={description} 
               onChange={(e) => setDescription(e.target.value)} 
-              placeholder="Describe the vibe..."
+              placeholder="What's the story behind this sound?"
+              className="bg-secondary/50 border-transparent focus:bg-background transition-all resize-none h-32"
             />
           </div>
         </div>
 
-        {/* Mint Button */}
-        <Button 
-          onClick={onMint} 
-          disabled={isPending || !title} 
-          className="w-full" 
-          size="lg"
-        >
-          {isPending ? (
-            <>{isUploading ? 'Uploading to IPFS...' : 'Processing Transaction...'}</>
-          ) : (
-            <>Mint NFT</>
-          )}
-        </Button>
+        {/* Actions */}
+        <div className="space-y-3 pt-4">
+            <Button 
+                onClick={onMint} 
+                disabled={isPending || !title} 
+                className={cn(
+                    "w-full h-14 text-lg font-bold rounded-xl shadow-lg transition-all hover:scale-[1.02]",
+                    isPending ? "bg-muted text-muted-foreground" : "bg-gradient-to-r from-primary to-orange-500 text-white hover:shadow-primary/40"
+                )}
+            >
+                {isPending ? (
+                    <div className="flex items-center gap-2">
+                        <span className="animate-spin">⏳</span>
+                        <span>{isUploading ? 'Uploading Assets...' : 'Confirming on Wallet...'}</span>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        <UploadCloud className="w-5 h-5" />
+                        <span>Mint NFT</span>
+                    </div>
+                )}
+            </Button>
+            
+            <Button 
+                variant="ghost" 
+                onClick={onRegenerate}
+                disabled={isPending}
+                className="w-full text-muted-foreground hover:text-foreground"
+            >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Discard & Create New
+            </Button>
+        </div>
+
       </CardContent>
     </Card>
   );

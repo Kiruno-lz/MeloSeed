@@ -3,7 +3,7 @@ import '@rainbow-me/rainbowkit/styles.css';
 import { Providers } from './providers';
 import { ToastProvider } from '@/components/Toast';
 import { ThemeProvider } from '@/components/theme-provider';
-import { Navbar } from '@/components/Navbar';
+// import { Navbar } from '@/components/Navbar';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -28,10 +28,7 @@ export default function RootLayout({
           >
             <ToastProvider>
               <div className="relative flex min-h-screen flex-col">
-                <Navbar />
-                <main className="flex-1 container max-w-screen-xl mx-auto py-8">
-                  {children}
-                </main>
+                {children}
               </div>
             </ToastProvider>
           </ThemeProvider>

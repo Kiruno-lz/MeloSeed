@@ -4,67 +4,67 @@
 
 @layer base {
   :root {
-    /* Light Mode - Warm Milky White */
-    --background: 40 20% 98%; /* #FFFDF8 */
-    --foreground: 240 10% 30%; /* #454554 */
+    /* Light Mode - Bright Purple Theme */
+    --background: 270 20% 98%; /* Very light lavender/white */
+    --foreground: 270 10% 20%; /* Dark purple-grey */
     
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 30%;
+    --card: 270 20% 99%;
+    --card-foreground: 270 10% 20%;
     
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 30%;
+    --popover: 270 20% 99%;
+    --popover-foreground: 270 10% 20%;
     
-    --primary: 265 80% 65%; /* Soft Purple */
+    --primary: 270 80% 60%; /* Bright Purple #9D4EDD */
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 35 30% 90%; /* Warm Beige */
-    --secondary-foreground: 240 10% 30%;
+    --secondary: 270 20% 92%; /* Light purple tint */
+    --secondary-foreground: 270 10% 20%;
     
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 5% 45%;
+    --muted: 270 20% 94%;
+    --muted-foreground: 270 5% 45%;
     
-    --accent: 265 80% 95%;
-    --accent-foreground: 265 80% 40%;
+    --accent: 270 80% 60%;
+    --accent-foreground: 0 0% 100%;
     
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 265 80% 65%;
+    --border: 270 15% 90%;
+    --input: 270 15% 90%;
+    --ring: 270 80% 60%;
     
-    --radius: 1.5rem; /* Very rounded */
+    --radius: 1rem;
   }
 
   .dark {
-    /* Dark Mode - Calm Grey-Black */
-    --background: 240 10% 10%; /* #17171C */
-    --foreground: 0 0% 90%;
+    /* Dark Mode - Deep Purple */
+    --background: 270 20% 10%; /* Dark Purple-Black */
+    --foreground: 270 10% 90%;
     
-    --card: 240 10% 14%; /* #202027 */
-    --card-foreground: 0 0% 90%;
+    --card: 270 20% 15%;
+    --card-foreground: 270 10% 90%;
     
-    --popover: 240 10% 14%;
-    --popover-foreground: 0 0% 90%;
+    --popover: 270 20% 15%;
+    --popover-foreground: 270 10% 90%;
     
-    --primary: 265 80% 75%; /* Lighter Purple */
-    --primary-foreground: 240 10% 10%;
+    --primary: 270 80% 65%; /* Lighter Bright Purple for dark mode */
+    --primary-foreground: 270 10% 10%;
     
-    --secondary: 240 10% 20%;
-    --secondary-foreground: 0 0% 90%;
+    --secondary: 270 20% 20%;
+    --secondary-foreground: 270 10% 90%;
     
-    --muted: 240 10% 20%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 270 20% 20%;
+    --muted-foreground: 270 5% 60%;
     
-    --accent: 240 10% 25%;
-    --accent-foreground: 0 0% 90%;
+    --accent: 270 80% 65%;
+    --accent-foreground: 270 10% 10%;
     
-    --destructive: 0 63% 31%;
+    --destructive: 0 62% 30%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 10% 20%;
-    --input: 240 10% 20%;
-    --ring: 265 80% 75%;
+    --border: 270 20% 20%;
+    --input: 270 20% 20%;
+    --ring: 270 80% 65%;
   }
 }
 
@@ -73,6 +73,33 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground transition-colors duration-300;
+    @apply bg-background text-foreground transition-colors duration-500 ease-in-out selection:bg-primary/20;
+  }
+}
+
+/* Custom Utilities */
+@layer utilities {
+  .glass {
+    @apply bg-background/60 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg;
+  }
+  
+  .glass-card {
+    @apply bg-white/40 dark:bg-black/20 backdrop-blur-lg border border-white/40 dark:border-white/10 shadow-xl;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400;
+  }
+  
+  /* Modern Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
   }
 }
