@@ -1,53 +1,48 @@
 # Project Roadmap & Known Issues
 
-This document tracks the current status of the project after merging the ERC1155 and Storage Architecture refactors.
+This document tracks the current status of the project, completed milestones, and future plans.
 
-## Current Status
-- **Contract**: Upgraded to ERC1155 (`MeloSeed.sol`). Supports multiple copies, burning, and unique per-token metadata.
-- **Storage**: IPFS via Pinata.
-- **Frontend**:
-  - Music Generation (Mock/Local).
-  - Cover Generation (Replicate API with Fallback).
-  - Custom Metadata Input (Title/Description).
-  - **NFT Player**: Refactored with Combobox (Input + Dropdown) for easy selection from "My Collection".
-  - **Fixes**: Resolved RPC Block Range error and image display issues.
+## Current Status (MVP)
 
-## Completed Tasks
-- [x] Fix RPC Error (Block Range Limit) by chunking/limiting block range.
-- [x] Fix Frontend Image Display for both API (Mint) and IPFS (Player) sources.
-- [x] Refactor NFT Player UX with Dropdown/Combobox.
-- [x] Integrate a real AI Image Generation API (Replicate with fallback).
-- [x] Restore "My Collection" view using client-side indexing (`useMyCollection` hook).
+The project has reached a stable MVP state on the Monad Devnet. Users can generate music, mint it as ERC1155 NFTs, view their collection, and play music directly from on-chain data (IPFS).
 
-## Known Issues & Todos
+- **Contract**: `MeloSeed.sol` (ERC1155 + Burnable + Ownable).
+- **Network**: Monad Devnet.
+- **Storage**: IPFS (Pinata).
 
-### 1. Environment Configuration
-- **Required**:
-  - `PINATA_JWT`: For IPFS uploads.
-  - `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID`: For RainbowKit.
-  - `REPLICATE_API_TOKEN`: (Optional) For real AI cover generation.
-  - `PRIVATE_KEY`: For contract deployment (backend/scripts).
-  - `NEXT_PUBLIC_MONAD_RPC_URL`: Optional, defaults to devnet.
+## Completed Milestones
 
-### 2. Hardhat & TypeScript
-- Always run deployment scripts with `TS_NODE_PROJECT=tsconfig.hardhat.json npx hardhat ...`.
+- [x] **Project Initialization**: Next.js + Hardhat setup.
+- [x] **Storage Refactor**: Moved from on-chain base64 (expensive) to IPFS (efficient).
+- [x] **Contract Upgrade**: Switched from ERC721 to ERC1155 for better batch handling and edition support.
+- [x] **Frontend Architecture**:
+    - Modularized components (`features/`).
+    - Centralized constants and utilities.
+- [x] **UX Improvements**:
+    - "Connect Wallet" landing view.
+    - Interactive "Ready to Mint" card.
+    - **Combobox Player**: Easy selection of owned NFTs.
+- [x] **Robustness**:
+    - Implemented `balanceOfBatch` strategy for reliable collection fetching on testnets.
+    - Added retry logic and timeouts for metadata fetching.
+    - Fallback mechanisms for AI generation (mock/local data).
 
-### 3. Deployment
-- **Contract Address**: `0xDfF0D0b3a294e22F86A99dD2DdE1d7810ab5Ca00` (Monad Devnet)
-- Ensure this address is updated in `app/page.tsx` and `components/NFTPlayer.tsx` after re-deployment.
+## Future Roadmap
 
+### Phase 2: Social & Marketplace
+- [ ] **Marketplace**: Simple Buy/Sell functionality (Atomic Swap).
+- [ ] **Social Sharing**: "Share on X/Farcaster" buttons.
+- [ ] **Likes/Voting**: On-chain or off-chain voting for best melodies.
 
-### 1. Environment Configuration
-- **Required**:
-  - `PINATA_JWT`: For IPFS uploads.
-  - `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID`: For RainbowKit.
-  - `REPLICATE_API_TOKEN`: (Optional) For real AI cover generation.
-  - `PRIVATE_KEY`: For contract deployment (backend/scripts).
-  - `NEXT_PUBLIC_MONAD_RPC_URL`: Optional, defaults to devnet.
+### Phase 3: Advanced Generation
+- [ ] **Real AI Music**: Integrate Replicate MusicGen API fully (currently mock/local for stability).
+- [ ] **Parameters**: Allow users to tweak generation parameters (BPM, Mood, Instrument).
 
-### 2. Hardhat & TypeScript
-- Always run deployment scripts with `TS_NODE_PROJECT=tsconfig.hardhat.json npx hardhat ...`.
+### Phase 4: Production Readiness
+- [ ] **Indexer**: Integrate The Graph or Goldsky for scalable NFT indexing.
+- [ ] **Mainnet Launch**: Deploy to Monad Mainnet.
 
-### 3. Deployment
-- **Contract Address**: `0xDfF0D0b3a294e22F86A99dD2DdE1d7810ab5Ca00` (Monad Devnet)
-- Ensure this address is updated in `app/page.tsx` and `components/NFTPlayer.tsx` after re-deployment.
+## Known Issues
+
+1.  **RPC Limits**: The public Monad Devnet RPC has strict rate limits. If the collection fails to load, try refreshing after a few seconds.
+2.  **IPFS Latency**: Public IPFS gateways can be slow. The player has a 60s timeout for this reason.

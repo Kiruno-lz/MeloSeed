@@ -53,8 +53,8 @@ export class ReplicateAdapter implements IMusicGenerator {
   }
 
   private async getMockAudio(): Promise<ArrayBuffer> {
-      const musicPath = path.join(process.cwd(), 'music_long.mp3');
-      console.log("Using local mock audio: music_long.mp3");
+      const musicPath = path.join(process.cwd(), 'public', 'assets', 'music_long.mp3');
+      console.log("Using local mock audio: public/assets/music_long.mp3");
       
       try {
         await fs.access(musicPath);

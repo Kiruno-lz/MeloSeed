@@ -8,8 +8,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "TS_NODE_PROJECT=tsconfig.hardhat.json hardhat run scripts/deploy.ts --network monadDevnet",
-    "compile": "hardhat compile"
+    "deploy": "cd smart-contracts && TS_NODE_PROJECT=tsconfig.hardhat.json npx hardhat run scripts/deploy.ts --network monadDevnet",
+    "compile": "cd smart-contracts && npx hardhat compile"
   },
   "keywords": [],
   "author": "",

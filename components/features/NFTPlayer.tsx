@@ -4,65 +4,55 @@ import { useState, useEffect } from 'react';
 import { useConfig, useWriteContract, useAccount } from 'wagmi';
 import { readContract } from 'wagmi/actions';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlayCircle, Search, Disc, AlertCircle, Flame, Trash2, ChevronDown } from 'lucide-react';
+import { PlayCircle, Search, Disc, AlertCircle, Flame, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import * as Popover from '@radix-ui/react-popover';
-
-// Contract address - make sure this matches page.tsx
-const CONTRACT_ADDRESS = '0xDfF0D0b3a294e22F86A99dD2DdE1d7810ab5Ca00';
-
-const MELO_SEED_ABI = [
-  {
-    inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }],
-    name: 'uri', // ERC1155 uses 'uri', not 'tokenURI'
-    outputs: [{ internalType: 'string', name: '', type: 'string' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-        { internalType: 'address', name: 'account', type: 'address' },
-        { internalType: 'uint256', name: 'id', type: 'uint256' },
-        { internalType: 'uint256', name: 'value', type: 'uint256' }
-    ],
-    name: 'burn',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  }
-] as const;
+import { CONTRACT_ADDRESS, MELO_SEED_ABI } from '@/lib/constants';
+import { resolveIpfsUrl } from '@/lib/utils';
 
 interface NFTPlayerProps {
     collectionIds?: bigint[];
 }
 
+/**
+ * NFTPlayer Component
+ * 
+ * Allows users to:
+ * 1. Browse their owned NFTs (collectionIds).
+ * 2. Manually search for any NFT by Token ID.
+ * 3. Play the music associated with the NFT.
+ * 4. Burn (destroy) the NFT.
+ */
 export function NFTPlayer({ collectionIds = [] }: NFTPlayerProps) {
   const config = useConfig();
   const { address } = useAccount();
+  
+  // State
   const [tokenId, setTokenId] = useState<string>('');
   const [queryState, setQueryState] = useState<{ id: bigint | null, attempts: number }>({ id: null, attempts: 0 });
   const [displayError, setDisplayError] = useState<string | null>(null);
   const [openCombobox, setOpenCombobox] = useState(false);
   
+  // Contract Write (Burn)
   const { writeContract, isPending: isBurning, isSuccess: isBurnSuccess, error: burnError } = useWriteContract();
   const { showToast } = useToast();
 
+  // Effect: Handle Burn Success/Error
   useEffect(() => {
     if (isBurnSuccess) {
         showToast("NFT Burned Successfully!", "success");
-        // Optional: Clear the view
-        // setQueryState({ id: null, attempts: 0 });
     }
     if (burnError) {
         showToast("Failed to burn NFT: " + burnError.message, "error");
     }
   }, [isBurnSuccess, burnError, showToast]);
 
-  // Custom fetcher with timeout logic
+  // Function: Fetch Token URI and Metadata
   const fetchTokenURI = async (id: bigint, attempt: number) => {
+    // Timeout logic: 5s for first attempts, then 60s
     const timeoutDuration = attempt < 2 ? 5000 : 60000; 
     console.log(`Fetching Token ${id} (Attempt ${attempt + 1}), Timeout: ${timeoutDuration}ms`);
 
@@ -81,27 +71,21 @@ export function NFTPlayer({ collectionIds = [] }: NFTPlayerProps) {
 
     const uri = await Promise.race([fetchPromise, timeoutPromise]);
     
-    // Now fetch the metadata from IPFS if it's a URL
+    // Process URI (IPFS or HTTP)
     if (typeof uri === 'string' && (uri.startsWith('http') || uri.startsWith('ipfs://'))) {
-        let fetchUrl = uri;
-        if (uri.startsWith('ipfs://')) {
-            fetchUrl = uri.replace('ipfs://', 'https://ipfs.io/ipfs/');
-        }
+        const fetchUrl = resolveIpfsUrl(uri);
         const res = await fetch(fetchUrl);
         if (!res.ok) throw new Error('Failed to fetch metadata from IPFS');
         const json = await res.json();
         
-        // Process IPFS URLs in metadata
-        if (json.animation_url?.startsWith('ipfs://')) {
-            json.animation_url = json.animation_url.replace('ipfs://', 'https://ipfs.io/ipfs/');
-        }
-        if (json.image?.startsWith('ipfs://')) {
-            json.image = json.image.replace('ipfs://', 'https://ipfs.io/ipfs/');
-        }
-        return json; // Return the parsed JSON object
+        // Resolve nested IPFS URLs
+        if (json.animation_url) json.animation_url = resolveIpfsUrl(json.animation_url);
+        if (json.image) json.image = resolveIpfsUrl(json.image);
+        
+        return json;
     }
     
-    // Fallback for base64 data URIs (old legacy)
+    // Fallback for legacy base64 data URIs
     if (typeof uri === 'string' && uri.startsWith('data:')) {
          const base64Json = uri.split(',')[1];
          const jsonString = atob(base64Json);
@@ -111,6 +95,7 @@ export function NFTPlayer({ collectionIds = [] }: NFTPlayerProps) {
     return null;
   };
 
+  // Query: Fetch Metadata
   const { data: metadata, isFetching, error } = useQuery({
     queryKey: ['uri', queryState.id?.toString(), queryState.attempts],
     queryFn: () => {
@@ -123,6 +108,7 @@ export function NFTPlayer({ collectionIds = [] }: NFTPlayerProps) {
 
   const effectiveError = displayError || (error ? (error instanceof Error ? error.message : "Failed to load NFT") : null);
 
+  // Handler: Search/Select ID
   const handleSearch = () => {
     if (tokenId === '') return;
     try {
@@ -141,6 +127,7 @@ export function NFTPlayer({ collectionIds = [] }: NFTPlayerProps) {
     }
   };
 
+  // Handler: Burn NFT
   const handleBurn = () => {
     if (queryState.id === null || !address) return;
     if (!confirm("Are you sure you want to burn (destroy) this NFT? This action cannot be undone.")) return;
@@ -153,8 +140,7 @@ export function NFTPlayer({ collectionIds = [] }: NFTPlayerProps) {
     });
   };
 
-  // The useQuery 'data' is now the parsed metadata object
-  const nftData = metadata as any; // Quick fix for type
+  const nftData = metadata as any;
   const audioSrc = nftData?.animation_url;
   const coverImage = nftData?.image;
 
@@ -191,8 +177,7 @@ export function NFTPlayer({ collectionIds = [] }: NFTPlayerProps) {
                         <button 
                             className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground z-10"
                             onClick={(e) => {
-                                e.stopPropagation(); // Prevent input focus/blur issues if any
-                                // Toggle handled by Root
+                                e.stopPropagation();
                             }}
                             aria-label="Select from collection"
                         >
