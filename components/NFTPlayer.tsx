@@ -127,9 +127,12 @@ export function NFTPlayer({ collectionIds = [] }: NFTPlayerProps) {
     if (tokenId === '') return;
     try {
         const id = BigInt(tokenId);
+        
+        // Force update if searching for the same ID (retry)
         if (queryState.id === id) {
              setQueryState(prev => ({ ...prev, attempts: prev.attempts + 1 }));
         } else {
+             // Reset attempts for new ID
              setQueryState({ id, attempts: 0 });
         }
         setDisplayError(null);
@@ -183,36 +186,56 @@ export function NFTPlayer({ collectionIds = [] }: NFTPlayerProps) {
                 />
                 
                 {/* Dropdown Trigger for Collection */}
-                {collectionIds.length > 0 && (
-                    <Popover.Root open={openCombobox} onOpenChange={setOpenCombobox}>
-                        <Popover.Trigger asChild>
-                            <button 
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-                                onClick={() => setOpenCombobox(!openCombobox)}
-                            >
-                                <ChevronDown className="w-4 h-4" />
-                            </button>
-                        </Popover.Trigger>
-                        <Popover.Content className="w-[200px] p-1 bg-popover border rounded-md shadow-md z-50 max-h-[200px] overflow-y-auto" align="end">
-                            <div className="text-xs font-semibold px-2 py-1.5 text-muted-foreground">Your Collection</div>
-                            {collectionIds.map(id => (
-                                <button
-                                    key={id.toString()}
-                                    className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm cursor-pointer"
-                                    onClick={() => {
-                                        setTokenId(id.toString());
-                                        setOpenCombobox(false);
-                                        // Auto trigger search
-                                        setQueryState({ id, attempts: 0 });
-                                        setDisplayError(null);
-                                    }}
-                                >
-                                    Token #{id.toString()}
-                                </button>
-                            ))}
+                <Popover.Root open={openCombobox} onOpenChange={setOpenCombobox}>
+                    <Popover.Trigger asChild>
+                        <button 
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground z-10"
+                            onClick={(e) => {
+                                e.stopPropagation(); // Prevent input focus/blur issues if any
+                                // Toggle handled by Root
+                            }}
+                            aria-label="Select from collection"
+                        >
+                            <ChevronDown className="w-4 h-4" />
+                        </button>
+                    </Popover.Trigger>
+                    
+                    <Popover.Portal>
+                        <Popover.Content 
+                            className="w-[var(--radix-popover-trigger-width)] min-w-[200px] p-1 bg-popover border rounded-md shadow-md z-50 max-h-[200px] overflow-y-auto animate-in fade-in zoom-in-95" 
+                            align="end"
+                            sideOffset={5}
+                        >
+                            <div className="text-xs font-semibold px-2 py-1.5 text-muted-foreground bg-muted/50 mb-1">
+                                Your Collection ({collectionIds.length})
+                            </div>
+                            
+                            {collectionIds.length === 0 ? (
+                                <div className="text-sm text-center py-4 text-muted-foreground">
+                                    No NFTs found. <br/>
+                                    <span className="text-xs opacity-70">Mint one to see it here!</span>
+                                </div>
+                            ) : (
+                                collectionIds.map(id => (
+                                    <button
+                                        key={id.toString()}
+                                        className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm cursor-pointer transition-colors flex items-center justify-between group"
+                                        onClick={() => {
+                                            const idStr = id.toString();
+                                            setTokenId(idStr);
+                                            setOpenCombobox(false);
+                                            setQueryState({ id, attempts: 0 });
+                                            setDisplayError(null);
+                                        }}
+                                    >
+                                        <span>Token #{id.toString()}</span>
+                                        <PlayCircle className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </button>
+                                ))
+                            )}
                         </Popover.Content>
-                    </Popover.Root>
-                )}
+                    </Popover.Portal>
+                </Popover.Root>
             </div>
 
           <Button
