@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ReplicateAdapter } from '@/lib/ai/replicate-adapter';
-import { compressAudio } from '@/lib/audio-compressor';
+import { compressAudio } from '@/lib/audio-utils';
 
 const musicGenerator = new ReplicateAdapter();
 
