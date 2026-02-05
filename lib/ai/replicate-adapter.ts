@@ -52,19 +52,31 @@ export class ReplicateAdapter implements IMusicGenerator {
 
   private async getMockAudio(): Promise<ArrayBuffer> {
       const musicPath = path.join(process.cwd(), 'public', 'assets', 'music_long.mp3');
-      console.log("Using local mock audio: public/assets/music_long.mp3");
+      const mockTrimmedPath = path.join(process.cwd(), 'public', 'assets', 'music_mock_20s.mp3');
+      
+      console.log("Using local mock audio");
       
       try {
         await fs.access(musicPath);
         
         // Attempt to trim audio using shared utility
         try {
-            return await trimAudioFile(musicPath, 20);
+            return await trimAudioFile(musicPath, 50);
         } catch (ffmpegError) {
-             console.warn("FFmpeg failed to trim audio, returning full file as fallback.", ffmpegError);
-             // Fallback: Return full file
-             const buffer = await fs.readFile(musicPath);
-             return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+             console.warn("FFmpeg failed to trim audio.", ffmpegError);
+             
+             // Fallback 1: Try pre-trimmed mock file
+             try {
+                console.log("Attempting to use pre-trimmed mock file...");
+                await fs.access(mockTrimmedPath);
+                const buffer = await fs.readFile(mockTrimmedPath);
+                return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+             } catch (fallbackError) {
+                 console.warn("Pre-trimmed mock file not found.", fallbackError);
+                 // Fallback 2: Return full file
+                 const buffer = await fs.readFile(musicPath);
+                 return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+             }
         }
 
       } catch (e) {
