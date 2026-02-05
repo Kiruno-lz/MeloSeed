@@ -1,8 +1,14 @@
 import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
+
+// Set ffmpeg path explicitly for Vercel/serverless environments
+if (ffmpegStatic) {
+  ffmpeg.setFfmpegPath(ffmpegStatic);
+}
 
 export async function compressAudio(inputBuffer: ArrayBuffer): Promise<Buffer> {
   // If we are in a serverless environment (like Vercel) without ffmpeg,
