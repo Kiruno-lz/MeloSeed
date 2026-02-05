@@ -17,6 +17,7 @@ interface MintingCardProps {
   description: string;
   setDescription: (value: string) => void;
   onRegenerate: () => void; // Allow user to go back
+  isAssetsReady?: boolean;
 }
 
 export function MintingCard({
@@ -27,7 +28,8 @@ export function MintingCard({
   setTitle,
   description,
   setDescription,
-  onRegenerate
+  onRegenerate,
+  isAssetsReady = true
 }: MintingCardProps) {
 
   return (
@@ -71,16 +73,21 @@ export function MintingCard({
         <div className="space-y-3 pt-4">
             <Button 
                 onClick={onMint} 
-                disabled={isPending || !title} 
+                disabled={isPending || !title || !isAssetsReady} 
                 className={cn(
                     "w-full h-14 text-lg font-bold rounded-xl shadow-lg transition-all hover:scale-[1.02]",
-                    isPending ? "bg-muted text-muted-foreground" : "bg-gradient-to-r from-primary to-orange-500 text-white hover:shadow-primary/40"
+                    (isPending || !isAssetsReady) ? "bg-muted text-muted-foreground" : "bg-gradient-to-r from-primary to-orange-500 text-white hover:shadow-primary/40"
                 )}
             >
                 {isPending ? (
                     <div className="flex items-center gap-2">
                         <span className="animate-spin">⏳</span>
                         <span>{isUploading ? 'Uploading Assets...' : 'Confirming on Wallet...'}</span>
+                    </div>
+                ) : !isAssetsReady ? (
+                    <div className="flex items-center gap-2">
+                        <span className="animate-spin">✨</span>
+                        <span>Generating Assets...</span>
                     </div>
                 ) : (
                     <div className="flex items-center gap-2">

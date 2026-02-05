@@ -36,7 +36,7 @@ interface NFTPlayerProps {
  * Universal NFT Player Component
  * Handles both "On-Chain Playback" and "Generation Preview"
  */
-export function NFTPlayer({ collectionIds = [], previewData, className }: NFTPlayerProps) {
+export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }: NFTPlayerProps) {
   const config = useConfig();
   const { address } = useAccount();
   
@@ -54,9 +54,16 @@ export function NFTPlayer({ collectionIds = [], previewData, className }: NFTPla
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (isBurnSuccess) showToast("NFT Burned Successfully!", "success");
+    if (isBurnSuccess) {
+        showToast("NFT Burned Successfully!", "success");
+        // Reset player state
+        setTokenId('');
+        setQueryState({ id: null, attempts: 0 });
+        // Refresh collection list
+        if (onBurn) onBurn();
+    }
     if (burnError) showToast("Failed to burn NFT: " + burnError.message, "error");
-  }, [isBurnSuccess, burnError, showToast]);
+  }, [isBurnSuccess, burnError, showToast, onBurn]);
 
   // --- Collection Logic ---
   const fetchTokenURI = async (id: bigint, attempt: number) => {
@@ -104,8 +111,25 @@ export function NFTPlayer({ collectionIds = [], previewData, className }: NFTPla
     } catch (e) { setDisplayError("Invalid Token ID"); }
   };
 
+  // Check ownership
+  const { data: balance } = useQuery({
+    queryKey: ['balance', address, queryState.id?.toString()],
+    queryFn: async () => {
+        if (!address || queryState.id === null) return null;
+        return readContract(config, {
+            address: CONTRACT_ADDRESS,
+            abi: MELO_SEED_ABI,
+            functionName: 'balanceOf',
+            args: [address, queryState.id],
+        });
+    },
+    enabled: !!address && queryState.id !== null,
+  });
+
+  const isOwner = balance ? balance > BigInt(0) : false;
+
   const handleBurn = () => {
-    if (queryState.id === null || !address) return;
+    if (queryState.id === null || !address || !isOwner) return;
     if (!confirm("Permanently destroy this NFT?")) return;
     writeContract({
         address: CONTRACT_ADDRESS,
@@ -249,7 +273,7 @@ export function NFTPlayer({ collectionIds = [], previewData, className }: NFTPla
                     )}
 
                     {/* Actions (Burn) - Only in Collection Mode */}
-                    {!isPreview && audioSrc && (
+                    {!isPreview && audioSrc && isOwner && (
                         <div className="flex justify-end pt-2">
                             <Button 
                                 variant="destructive" 

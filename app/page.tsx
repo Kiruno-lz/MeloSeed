@@ -86,8 +86,16 @@ export default function Home() {
     // Check wallet connection ONLY when minting
     if (!isConnected || !address) {
         showToast("Please connect your wallet to mint.", "error");
-        // Open connect modal? RainbowKit hook needed for imperative open
-        // For now, user sees the button in header.
+        return;
+    }
+
+    // Check if assets are ready
+    if (!generatedData.audioBase64) {
+        showToast("Audio is not ready yet.", "error");
+        return;
+    }
+    if (!coverUrl) {
+        showToast("Cover image is still generating. Please wait...", "error");
         return;
     }
     
@@ -175,6 +183,7 @@ export default function Home() {
                                     description={description}
                                     setDescription={setDescription}
                                     onRegenerate={() => setGeneratedData(null)}
+                                    isAssetsReady={!!generatedData?.audioBase64 && !!coverUrl}
                                 />
                             </div>
                         </div>
@@ -195,7 +204,13 @@ export default function Home() {
                     
                     {isConnected ? (
                         <div className="flex justify-center">
-                            <NFTPlayer collectionIds={tokenIds} />
+                            <NFTPlayer 
+                                collectionIds={tokenIds} 
+                                onBurn={() => {
+                                    // Refresh collection after burning
+                                    setTimeout(() => refetchCollection(), 2000);
+                                }}
+                            />
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 gap-6 opacity-80">

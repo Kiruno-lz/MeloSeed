@@ -1,14 +1,20 @@
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
 // Shared initialization
 if (ffmpegStatic) {
-  console.log("Initializing FFmpeg with path:", ffmpegStatic);
-  ffmpeg.setFfmpegPath(ffmpegStatic);
+  // Verify if the binary actually exists at the path
+  if (existsSync(ffmpegStatic)) {
+    console.log("Initializing FFmpeg with path:", ffmpegStatic);
+    ffmpeg.setFfmpegPath(ffmpegStatic);
+  } else {
+    console.warn(`ffmpeg-static path provided (${ffmpegStatic}) but file does not exist. This is expected on Vercel Serverless environments due to size limits.`);
+  }
 } else {
   console.warn("ffmpeg-static not found or failed to load!");
 }
@@ -19,8 +25,8 @@ if (ffmpegStatic) {
  */
 const AUDIO_OPTS = {
   codec: 'libmp3lame',
-  bitrate: 32, // 32kbps
-  channels: 1, // Mono
+  bitrate: 128, // 32kbps
+  channels: 2, // Mono
   format: 'mp3'
 };
 
