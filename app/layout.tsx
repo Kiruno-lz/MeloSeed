@@ -9,6 +9,9 @@ import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'MeloSeed - On-Chain AI Music',
   description: 'Generate and Mint AI Music on Monad',
+  icons: {
+    icon: '../public/logo.png',
+  },
 };
 
 export default function RootLayout({

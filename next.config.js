@@ -1,5 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    serverExternalPackages: ['ffmpeg-static', 'fluent-ffmpeg'],
+    async headers() {
+        return [
+            {
+                source: '/:path*',
+                headers: [
+                    {
+                        key: 'Cross-Origin-Opener-Policy',
+                        value: 'same-origin-allow-popups',
+                    },
+                ],
+            },
+        ];
+    },
     webpack: (config) => {
         config.externals.push('pino-pretty', 'lokijs', 'encoding');
         

@@ -7,8 +7,12 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Shared initialization
 if (ffmpegStatic) {
+  console.log("Initializing FFmpeg with path:", ffmpegStatic);
   ffmpeg.setFfmpegPath(ffmpegStatic);
+} else {
+  console.warn("ffmpeg-static not found or failed to load!");
 }
+
 
 /**
  * Common Audio Processing Options
