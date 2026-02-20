@@ -13,7 +13,7 @@ export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
       throw new Error('GEMINI_API_KEY is not set');
     }
     this.client = new GoogleGenerativeAI(apiKey);
-    this.imageClient = new GoogleGenAI({ apiKey, apiVersion: 'v1' });
+    this.imageClient = new GoogleGenAI({ apiKey });
   }
 
   async analyze(audioData: ArrayBuffer): Promise<MusicAnalysisResult> {
@@ -96,9 +96,6 @@ Make the description feel human and emotionally resonant - like something you'd 
     }
 
     try {
-      const aspectRatios = ['1:1'];
-      const aspectRatio = aspectRatios[0];
-      
       const styleColors = [
         { hex: '#9900ff', name: 'violet' },
         { hex: '#5200ff', name: 'blue' },
@@ -123,25 +120,26 @@ Make the description feel human and emotionally resonant - like something you'd 
       ];
       const artisticStyle = artisticStyles[Math.floor(Math.random() * artisticStyles.length)];
 
-      const coverPrompt = `Album cover art for "${analysis.title}". ${analysis.description}. Mood: ${analysis.mood}, Genre: ${analysis.genre}, Tags: ${analysis.tags.join(', ')}. Create a ${artisticStyle}. Use a color palette centered around ${selectedStyle.name} (#${selectedStyle.hex}). Aspect ratio 1:1, 360x360 pixels. Style: highly artistic, emotionally evocative, modern digital art, professional album cover quality. Make it visually stunning and unique.`;
+      const coverPrompt = `Album cover art for "${analysis.title}". ${analysis.description}. Mood: ${analysis.mood}, Genre: ${analysis.genre}, Tags: ${analysis.tags.join(', ')}. Create a ${artisticStyle}. Use a color palette centered around ${selectedStyle.name} (#${selectedStyle.hex}). Aspect ratio 1:1. Style: highly artistic, emotionally evocative, modern digital art, professional album cover quality. Make it visually stunning and unique.`;
 
-      const response = await this.imageClient.models.generateImages({
-        model: 'imagen-4.0-generate-001',
-        prompt: coverPrompt,
+      const response = await this.imageClient.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: coverPrompt,
         config: {
-          numberOfImages: 1,
-          outputOptions: {
-            mimeType: 'image/png',
-          },
+          responseModalities: ['TEXT', 'IMAGE'],
         },
       });
       
-      for (const generatedImage of response.generatedImages) {
-        const imgBytes = generatedImage.image.imageBytes;
-        const buffer = Buffer.from(imgBytes, 'base64');
-        const blob = new Blob([buffer], { type: 'image/png' });
-        const coverUrl = await uploadFileToIPFS(blob);
-        return coverUrl;
+      for (const candidate of response.candidates || []) {
+        for (const part of candidate.content?.parts || []) {
+          if (part.inlineData) {
+            const imageData = part.inlineData.data;
+            const buffer = Buffer.from(imageData, 'base64');
+            const blob = new Blob([buffer], { type: 'image/png' });
+            const coverUrl = await uploadFileToIPFS(blob);
+            return coverUrl;
+          }
+        }
       }
 
       return '/logo.png';

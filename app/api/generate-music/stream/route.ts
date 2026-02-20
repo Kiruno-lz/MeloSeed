@@ -90,8 +90,14 @@ export async function POST(req: NextRequest) {
                   const combined = combineAudioChunks(audioChunks);
                   safeEnqueue(`event: complete\ndata: ${JSON.stringify({ audio: combined })}\n\n`);
                 }
-                closed = true;
-                controller.close();
+                if (!closed) {
+                  closed = true;
+                  try {
+                    controller.close();
+                  } catch (e) {
+                    console.log('Controller already closed');
+                  }
+                }
               }
             },
           });
