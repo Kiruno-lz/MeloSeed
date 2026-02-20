@@ -22,7 +22,7 @@ export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
+      const model = this.client.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
       const base64Audio = this.arrayBufferToBase64(audioData);
       
@@ -94,7 +94,7 @@ Make the description feel human and emotionally resonant - like something you'd 
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-2.0-flash-exp-image-generation' });
+      const model = this.client.getGenerativeModel({ model: 'imagen-3.0-generate-002' });
 
       const styleColors = ['#9900ff', '#5200ff', '#ff25f6', '#2af6de', '#ffdd28', '#3dffab', '#d8ff3e', '#d9b2ff'];
       const randomColor = styleColors[Math.floor(Math.random() * styleColors.length)];
@@ -141,7 +141,7 @@ Create a beautiful, abstract, minimalistic album cover art. Use a color palette 
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-2.0-flash-exp-image-generation' });
+      const model = this.client.getGenerativeModel({ model: 'imagen-3.0-generate-002' });
 
       const coverPrompt = `Create an album cover art for a music track with the following characteristics:
 - Title: ${analysis.title}
@@ -185,7 +185,7 @@ Create a beautiful, abstract, minimalistic album cover art with harmonious color
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-2.0-flash-exp-image-generation' });
+      const model = this.client.getGenerativeModel({ model: 'imagen-3.0-generate-002' });
 
       const result = await model.generateContent(prompt);
       
@@ -232,7 +232,7 @@ Create a beautiful, abstract, minimalistic album cover art with harmonious color
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
+      const model = this.client.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
       const prompt = `Based on this music style mix: ${styleText}
 
