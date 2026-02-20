@@ -291,9 +291,6 @@ export function StreamingPlayer({
                 )}
               </Button>
             </div>
-                </Button>
-              )}
-            </div>
           </div>
         </div>
       </div>
