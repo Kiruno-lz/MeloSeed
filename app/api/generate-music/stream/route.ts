@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
           console.log('🎵 Style Mix:', weightedPrompts.map(p => `${p.text}:${Math.round(p.weight*100)}%`).join(' | '));
           console.log('🔊 Starting Lyria RealTime streaming...');
 
-          const client = new GoogleGenAI({ apiKey: apiKey });
+          const client = new GoogleGenAI({ apiKey: apiKey, apiVersion: 'v1alpha' });
           const model = 'models/lyria-realtime-exp';
           const audioChunks: Uint8Array[] = [];
 
