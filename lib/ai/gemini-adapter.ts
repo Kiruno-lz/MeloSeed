@@ -1,7 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { IMusicAnalyzer, MusicAnalysisResult } from './types';
+import { IMusicAnalyzer, IMusicAnalyzerWithCover, MusicAnalysisResult, CompleteMusicMetadata } from './types';
+import { uploadFileToIPFS } from '../ipfs-client';
 
-export class GeminiAdapter implements IMusicAnalyzer {
+export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
   private client: GoogleGenerativeAI;
 
   constructor() {
@@ -65,6 +66,102 @@ Respond in JSON format with keys: title, description, tags, mood, genre`;
     }
   }
 
+  async analyzeAndGenerateCover(audioData: ArrayBuffer): Promise<CompleteMusicMetadata> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      console.warn('No GEMINI_API_KEY found, returning mock analysis with cover.');
+      return this.getMockCompleteMetadata();
+    }
+
+    const analysis = await this.analyze(audioData);
+    const coverUrl = await this.generateCover(analysis);
+
+    return {
+      ...analysis,
+      coverUrl
+    };
+  }
+
+  private async generateCover(analysis: MusicAnalysisResult): Promise<string> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      return '/logo.png';
+    }
+
+    try {
+      const model = this.client.getGenerativeModel({ model: 'gemini-2.0-flash-exp-image-generation' });
+
+      const coverPrompt = `Create an album cover art for a music track with the following characteristics:
+- Title: ${analysis.title}
+- Description: ${analysis.description}
+- Mood: ${analysis.mood}
+- Genre: ${analysis.genre}
+- Tags: ${analysis.tags.join(', ')}
+
+Create a beautiful, abstract, minimalistic album cover art with harmonious colors that match the mood. Style: modern, artistic, high quality digital art, 1024x1024.`;
+
+      const result = await model.generateContent(coverPrompt);
+      
+      const responseText = result.response.text();
+      
+      const imageMatch = responseText.match(/"base64":\s*"([^"]+)"/);
+      if (imageMatch) {
+        const base64Image = imageMatch[1];
+        const imageBuffer = Buffer.from(base64Image, 'base64');
+        const blob = new Blob([imageBuffer], { type: 'image/png' });
+        const coverUrl = await uploadFileToIPFS(blob);
+        return coverUrl;
+      }
+
+      const urlMatch = responseText.match(/"url":\s*"([^"]+)"/);
+      if (urlMatch) {
+        return urlMatch[1];
+      }
+
+      return '/logo.png';
+    } catch (error) {
+      console.error('Cover generation error:', error);
+      return '/logo.png';
+    }
+  }
+
+  async generateCoverFromPrompt(prompt: string): Promise<string> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      return '/logo.png';
+    }
+
+    try {
+      const model = this.client.getGenerativeModel({ model: 'gemini-2.0-flash-exp-image-generation' });
+
+      const result = await model.generateContent(prompt);
+      
+      const responseText = result.response.text();
+      
+      const imageMatch = responseText.match(/"base64":\s*"([^"]+)"/);
+      if (imageMatch) {
+        const base64Image = imageMatch[1];
+        const imageBuffer = Buffer.from(base64Image, 'base64');
+        const blob = new Blob([imageBuffer], { type: 'image/png' });
+        const coverUrl = await uploadFileToIPFS(blob);
+        return coverUrl;
+      }
+
+      const urlMatch = responseText.match(/"url":\s*"([^"]+)"/);
+      if (urlMatch) {
+        return urlMatch[1];
+      }
+
+      return '/logo.png';
+    } catch (error) {
+      console.error('Cover generation error:', error);
+      return '/logo.png';
+    }
+  }
+
   private arrayBufferToBase64(buffer: ArrayBuffer): string {
     const bytes = new Uint8Array(buffer);
     let binary = '';
@@ -81,6 +178,17 @@ Respond in JSON format with keys: title, description, tags, mood, genre`;
       tags: ['lo-fi', 'chill', 'piano', 'relaxing', 'ambient'],
       mood: 'calm',
       genre: 'lo-fi'
+    };
+  }
+
+  private getMockCompleteMetadata(): CompleteMusicMetadata {
+    return {
+      title: 'Midnight Dreams',
+      description: 'A soothing lo-fi track with soft piano melodies and gentle beats, perfect for relaxation and focus.',
+      tags: ['lo-fi', 'chill', 'piano', 'relaxing', 'ambient'],
+      mood: 'calm',
+      genre: 'lo-fi',
+      coverUrl: '/logo.png'
     };
   }
 }

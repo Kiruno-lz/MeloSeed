@@ -12,12 +12,23 @@ import { useMyCollection } from '@/lib/hooks/useMyCollection';
 import { CONTRACT_ADDRESS, MELO_SEED_ABI } from '@/lib/constants';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
+interface CompleteMusicData {
+  seed: number;
+  audioBase64: string;
+  title: string;
+  description: string;
+  tags: string[];
+  mood: string;
+  genre: string;
+  coverUrl: string | null;
+}
+
 export default function Home() {
   const { address, isConnected } = useAccount();
   const [view, setView] = useState<'create' | 'collection'>('create');
   
   // Generation State
-  const [generatedData, setGeneratedData] = useState<{ seed: number; audioBase64: string } | null>(null);
+  const [generatedData, setGeneratedData] = useState<CompleteMusicData | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -31,13 +42,12 @@ export default function Home() {
 
   const isPending = isUploading || isTxPending;
 
-  // Effect: Reset/Default metadata when new music is generated
+  // Effect: Set metadata when new music is generated (all data from API)
   useEffect(() => {
     if (generatedData) {
-      setTitle(`MeloSeed #${generatedData.seed}`);
-      setDescription(`A unique AI-generated melody seeded by ${generatedData.seed}.`);
-      setCoverUrl(null); 
-      generateCover(generatedData.seed);
+      setTitle(generatedData.title);
+      setDescription(generatedData.description);
+      setCoverUrl(generatedData.coverUrl);
     }
   }, [generatedData]);
 
@@ -53,31 +63,16 @@ export default function Home() {
   useEffect(() => {
     if (isSuccess) {
       showToast('NFT Minted Successfully!', 'success');
-      setGeneratedData(null); // Reset to allow creating another
+      setGeneratedData(null);
       setCoverUrl(null);
-      // Switch to collection view after a delay
+      setTitle('');
+      setDescription('');
       setTimeout(() => {
           refetchCollection();
           setView('collection');
       }, 2000);
     }
   }, [isSuccess, showToast, refetchCollection]);
-
-  // Generate AI Cover
-  const generateCover = async (seed: number) => {
-      try {
-          const res = await fetch('/api/generate-cover', { 
-            method: 'POST',
-            body: JSON.stringify({ prompt: `Abstract visualization of music seed ${seed}` })
-          });
-          if (res.ok) {
-              const data = await res.json();
-              setCoverUrl(data.url);
-          }
-      } catch (e) {
-          console.error("Cover generation failed", e);
-      }
-  };
 
   // Handle Mint
   const handleMint = async () => {
@@ -89,13 +84,9 @@ export default function Home() {
         return;
     }
 
-    // Check if assets are ready
-    if (!generatedData.audioBase64) {
-        showToast("Audio is not ready yet.", "error");
-        return;
-    }
-    if (!coverUrl) {
-        showToast("Cover image is still generating. Please wait...", "error");
+    // Check if assets are ready - now all assets are ready from the start
+    if (!generatedData.audioBase64 || !coverUrl) {
+        showToast("Assets are not ready yet. Please wait...", "error");
         return;
     }
     
@@ -110,7 +101,7 @@ export default function Home() {
             const coverBlob = await coverRes.blob();
             imageURI = await uploadFileToIPFS(coverBlob);
         } else {
-            const coverRes = await fetch('/test.png'); // Fallback
+            const coverRes = await fetch('/logo.png');
             const coverBlob = await coverRes.blob();
             imageURI = await uploadFileToIPFS(coverBlob); 
         }
@@ -120,7 +111,12 @@ export default function Home() {
             description: description, 
             image: imageURI,
             animation_url: audioURI,
-            attributes: [{ trait_type: "Seed", value: generatedData.seed.toString() }]
+            attributes: [
+                { trait_type: "Seed", value: generatedData.seed.toString() },
+                { trait_type: "Mood", value: generatedData.mood },
+                { trait_type: "Genre", value: generatedData.genre },
+                { trait_type: "Tags", value: generatedData.tags.join(', ') }
+            ]
         };
         const tokenURI = await uploadJSONToIPFS(metadata);
 
@@ -207,7 +203,6 @@ export default function Home() {
                             <NFTPlayer 
                                 collectionIds={tokenIds} 
                                 onBurn={() => {
-                                    // Refresh collection after burning
                                     setTimeout(() => refetchCollection(), 2000);
                                 }}
                             />

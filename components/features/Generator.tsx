@@ -4,42 +4,107 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Dice5, SlidersHorizontal } from 'lucide-react';
+import { Sparkles, Dice5, SlidersHorizontal, Music, FileText, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface GeneratorProps {
-  onGenerated: (data: { seed: number; audioBase64: string }) => void;
+interface CompleteMusicData {
+  seed: number;
+  audioBase64: string;
+  title: string;
+  description: string;
+  tags: string[];
+  mood: string;
+  genre: string;
+  coverUrl: string | null;
 }
+
+interface GeneratorProps {
+  onGenerated: (data: CompleteMusicData) => void;
+}
+
+type GenerationStage = 'idle' | 'generating' | 'analyzing' | 'cover' | 'complete';
 
 export function Generator({ onGenerated }: GeneratorProps) {
   const [prompt, setPrompt] = useState('');
   const [seed, setSeed] = useState(Math.floor(Math.random() * 1000000));
   const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<GenerationStage>('idle');
   const [error, setError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const getStageText = () => {
+    switch (stage) {
+      case 'generating':
+        return 'SYNTHESIZING...';
+      case 'analyzing':
+        return 'ANALYZING...';
+      case 'cover':
+        return 'CREATING COVER...';
+      case 'complete':
+        return 'COMPLETE!';
+      default:
+        return 'SYNTHESIZING...';
+    }
+  };
+
+  const getStageProgress = () => {
+    switch (stage) {
+      case 'generating':
+        return 25;
+      case 'analyzing':
+        return 50;
+      case 'cover':
+        return 75;
+      case 'complete':
+        return 100;
+      default:
+        return 0;
+    }
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
     setError('');
+    setStage('generating');
+    
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, seed }),
+        body: JSON.stringify({ 
+          prompt, 
+          seed,
+          style: 'calm, soothing, gentle, relaxing, soft melody, ambient, peaceful, dreamy',
+          duration: 15,
+          bpm: 80
+        }),
       });
 
       if (!res.ok) throw new Error('Generation failed');
 
       const data = await res.json();
-      onGenerated({ seed: Number(data.seed), audioBase64: data.audioBase64 });
       
-      // Randomize next seed for convenience
+      setStage('complete');
+      
+      onGenerated({ 
+        seed: Number(data.seed), 
+        audioBase64: data.audioBase64,
+        title: data.title || `MeloSeed #${data.seed}`,
+        description: data.description || '',
+        tags: data.tags || [],
+        mood: data.mood || 'unknown',
+        genre: data.genre || 'unknown',
+        coverUrl: data.coverUrl || null
+      });
+      
       setSeed(Math.floor(Math.random() * 1000000));
     } catch (err) {
       setError('Failed to generate music. Please try again.');
       console.error(err);
+      setStage('idle');
     } finally {
       setLoading(false);
+      setTimeout(() => setStage('idle'), 2000);
     }
   };
 
@@ -60,6 +125,32 @@ export function Generator({ onGenerated }: GeneratorProps) {
             
             <CardContent className="p-6 relative z-10 space-y-6">
                 
+                {/* Progress Indicator */}
+                {loading && (
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                                <Music className="w-3 h-3" />
+                                Music
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <FileText className="w-3 h-3" />
+                                Analysis
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <ImageIcon className="w-3 h-3" />
+                                Cover
+                            </span>
+                        </div>
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-gradient-to-r from-primary to-purple-500 transition-all duration-500"
+                                style={{ width: `${getStageProgress()}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
+                
                 {/* Main Action Button */}
                 <div className="flex-1" />
                 <Button
@@ -73,7 +164,7 @@ export function Generator({ onGenerated }: GeneratorProps) {
                     {loading ? (
                         <div className="flex flex-col items-center gap-2">
                             <span className="animate-spin text-3xl">✺</span>
-                            <span className="text-sm font-medium tracking-widest opacity-80">SYNTHESIZING...</span>
+                            <span className="text-sm font-medium tracking-widest opacity-80">{getStageText()}</span>
                         </div>
                     ) : (
                         <div className="flex items-center gap-3">

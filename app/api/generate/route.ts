@@ -1,32 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ReplicateAdapter } from '@/lib/ai/replicate-adapter';
+import { GeminiMusicAdapter } from '@/lib/ai/gemini-music-adapter';
+import { GeminiAdapter } from '@/lib/ai/gemini-adapter';
 import { compressAudio } from '@/lib/audio-utils';
+import { base64ToArrayBuffer } from '@/lib/utils';
 
-const musicGenerator = new ReplicateAdapter();
+const musicGenerator = new GeminiMusicAdapter();
+const musicAnalyzer = new GeminiAdapter();
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, seed } = await req.json();
+    const { prompt, seed, style, duration, bpm } = await req.json();
 
     if (!seed) {
       return NextResponse.json({ error: 'Seed is required' }, { status: 400 });
     }
 
-    console.log(`Generating music for seed: ${seed}, prompt: ${prompt}`);
+    console.log(`Generating music for seed: ${seed}, prompt: ${prompt}, style: ${style}`);
 
-    // 1. Generate Music
-    const rawAudioBuffer = await musicGenerator.generate(prompt || '', Number(seed), 1); // 1 second
+    const generationResult = await musicGenerator.generate({
+      seed: Number(seed),
+      prompt: prompt || '',
+      style: style || 'calm, soothing, gentle, relaxing, soft melody, ambient',
+      duration: duration || 15,
+      bpm: bpm || 80
+    });
 
-    // 2. Compress Audio (Server-side)
-    const compressedBuffer = await compressAudio(rawAudioBuffer);
+    const audioArrayBuffer = base64ToArrayBuffer(generationResult.audioBase64);
+    const compressedBuffer = await compressAudio(audioArrayBuffer);
+    const audioBase64 = Buffer.from(compressedBuffer).toString('base64');
 
-    // 3. Convert to Base64
-    const audioBase64 = compressedBuffer.toString('base64');
+    console.log(`Analyzing music and generating cover for seed: ${seed}`);
+    
+    const metadata = await musicAnalyzer.analyzeAndGenerateCover(compressedBuffer.buffer as ArrayBuffer);
+
+    console.log(`Generation complete for seed: ${seed}`, {
+      title: metadata.title,
+      coverUrl: metadata.coverUrl
+    });
 
     return NextResponse.json({
-      seed,
+      seed: generationResult.seed,
       audioBase64,
-      mimeType: 'audio/mp3',
+      audioFormat: generationResult.audioFormat,
+      title: metadata.title,
+      description: metadata.description,
+      tags: metadata.tags,
+      mood: metadata.mood,
+      genre: metadata.genre,
+      coverUrl: metadata.coverUrl
     });
 
   } catch (error) {
