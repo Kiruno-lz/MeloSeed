@@ -1,139 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sparkles, Dice5, SlidersHorizontal, Music, FileText, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useStreamingMusic } from '@/lib/hooks/useStreamingMusic';
-
-interface StyleMixItem {
-  name: string;
-  weight: number;
-  color: string;
-}
-
-interface CompleteMusicData {
-  seed: number;
-  audioBase64?: string;
-  title: string;
-  description: string;
-  tags: string[];
-  mood: string;
-  genre: string;
-  coverUrl: string | null;
-  styleMix?: StyleMixItem[];
-  seedHash?: string;
-}
 
 interface GeneratorProps {
-  onGenerated: (data: CompleteMusicData) => void;
-  onMusicReady?: (data: { seed: number; seedHash: string; styleMix: StyleMixItem[] }) => void;
+  onGenerate: (prompt: string, seed: number, style: string, duration: number, bpm: number) => void;
 }
 
-type GenerationStage = 'idle' | 'generating' | 'analyzing' | 'cover' | 'complete';
+type GenerationStage = 'idle' | 'generating';
 
-export function Generator({ onGenerated, onMusicReady }: GeneratorProps) {
+export function Generator({ onGenerate }: GeneratorProps) {
   const [prompt, setPrompt] = useState('');
   const [seed, setSeed] = useState(Math.floor(Math.random() * 1000000));
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<GenerationStage>('idle');
-  const [error, setError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
-
-  const { isStreaming, initData, startStream, stopStream } = useStreamingMusic();
-
-  useEffect(() => {
-    if (initData && !loading) {
-      setLoading(true);
-      setStage('generating');
-      onMusicReady?.({
-        seed: initData.seed,
-        seedHash: initData.seedHash,
-        styleMix: initData.styleMix
-      });
-      onGenerated({
-        seed: initData.seed,
-        title: `MeloSeed #${initData.seed}`,
-        description: '',
-        tags: [],
-        mood: 'unknown',
-        genre: 'unknown',
-        coverUrl: null,
-        styleMix: initData.styleMix,
-        seedHash: initData.seedHash
-      });
-
-      if (initData.styleMix && initData.styleMix.length > 0) {
-        setStage('analyzing');
-        Promise.all([
-          fetch('/api/generate-title', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ styleMix: initData.styleMix })
-          }).then(res => res.json()).catch(console.error),
-          
-          fetch('/api/generate-cover-gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: `MeloSeed #${initData.seed}`,
-              description: '',
-              tags: [],
-              mood: 'unknown',
-              genre: 'unknown'
-            })
-          }).then(res => res.json()).catch(console.error)
-        ]).then(([titleData, coverData]) => {
-          const currentData = {
-            seed: initData.seed,
-            title: `MeloSeed #${initData.seed}`,
-            description: '',
-            tags: [],
-            mood: 'unknown',
-            genre: 'unknown',
-            coverUrl: null as string | null,
-            styleMix: initData.styleMix,
-            seedHash: initData.seedHash
-          };
-          const updatedData = {
-            ...currentData,
-            title: titleData?.title || currentData.title,
-            description: titleData?.description || '',
-            tags: titleData?.tags || [],
-            mood: titleData?.mood || 'unknown',
-            genre: titleData?.genre || 'unknown',
-            coverUrl: coverData?.coverUrl || null
-          };
-          setStage('cover');
-          onGenerated(updatedData);
-        }).catch(err => {
-          console.error('Background generation error:', err);
-        });
-      }
-    }
-  }, [initData, loading, onMusicReady, onGenerated]);
-
-  useEffect(() => {
-    if (!isStreaming && loading) {
-      setLoading(false);
-      setStage('complete');
-      setSeed(Math.floor(Math.random() * 1000000));
-      setTimeout(() => setStage('idle'), 2000);
-    }
-  }, [isStreaming, loading]);
 
   const getStageText = () => {
     switch (stage) {
       case 'generating':
         return 'SYNTHESIZING...';
-      case 'analyzing':
-        return 'ANALYZING...';
-      case 'cover':
-        return 'CREATING COVER...';
-      case 'complete':
-        return 'COMPLETE!';
       default:
         return 'SYNTHESIZING...';
     }
@@ -143,12 +33,6 @@ export function Generator({ onGenerated, onMusicReady }: GeneratorProps) {
     switch (stage) {
       case 'generating':
         return 25;
-      case 'analyzing':
-        return 50;
-      case 'cover':
-        return 75;
-      case 'complete':
-        return 100;
       default:
         return 0;
     }
@@ -156,23 +40,21 @@ export function Generator({ onGenerated, onMusicReady }: GeneratorProps) {
 
   const handleGenerate = () => {
     setLoading(true);
-    setError('');
     setStage('generating');
     
-    try {
-      startStream(
-        prompt,
-        seed,
-        'calm, soothing, gentle, relaxing, soft melody, ambient, peaceful, dreamy',
-        15,
-        80
-      );
-    } catch (err) {
-      setError('Failed to start streaming. Please try again.');
-      console.error(err);
+    onGenerate(
+      prompt,
+      seed,
+      'calm, soothing, gentle, relaxing, soft melody, ambient, peaceful, dreamy',
+      15,
+      80
+    );
+    
+    setTimeout(() => {
       setLoading(false);
       setStage('idle');
-    }
+      setSeed(Math.floor(Math.random() * 1000000));
+    }, 100);
   };
 
   return (
@@ -211,7 +93,7 @@ export function Generator({ onGenerated, onMusicReady }: GeneratorProps) {
                         </div>
                         <div className="h-2 bg-secondary rounded-full overflow-hidden">
                             <div 
-                                className="h-full bg-gradient-to-r from-primary to-purple-500 transition-all duration-500"
+                                className="h-full bg-gradient-to-r from-primary to-purple-500 transition-all duration-500 animate-pulse"
                                 style={{ width: `${getStageProgress()}%` }}
                             />
                         </div>
@@ -243,13 +125,6 @@ export function Generator({ onGenerated, onMusicReady }: GeneratorProps) {
                     {/* Button Shine Effect */}
                     {!loading && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite]" />}
                 </Button>
-
-                {/* Error Feedback */}
-                {error && (
-                    <div className="text-destructive text-sm font-medium text-center animate-pulse bg-destructive/10 p-2 rounded-lg">
-                        {error}
-                    </div>
-                )}
 
                 {/* Advanced Options Toggle */}
                 <div className="space-y-4">

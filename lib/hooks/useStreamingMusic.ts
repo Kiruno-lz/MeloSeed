@@ -30,8 +30,7 @@ export function useStreamingMusic(): UseStreamingMusicReturn {
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const isPlayingRef = useRef(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const chunksRef = useRef<Uint8Array[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const initAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
@@ -96,72 +95,93 @@ export function useStreamingMusic(): UseStreamingMusicReturn {
     }
   }, [initAudioContext, decodeAudioChunk]);
 
-  const startStream = useCallback((prompt: string, seed: number, style: string, duration: number, bpm: number) => {
+  const startStream = useCallback(async (prompt: string, seed: number, style: string, duration: number, bpm: number) => {
     setIsStreaming(true);
     setError(null);
     setInitData(null);
-    chunksRef.current = [];
     nextStartTimeRef.current = 0;
     isPlayingRef.current = false;
 
-    const eventSource = new EventSource('/api/generate-music/stream');
-    eventSourceRef.current = eventSource;
+    abortControllerRef.current = new AbortController();
 
-    eventSource.addEventListener('init', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        setInitData(data);
-      } catch (err) {
-        console.error('Failed to parse init data:', err);
+    try {
+      const response = await fetch('/api/generate-music/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, seed, style, duration, bpm }),
+        signal: abortControllerRef.current.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
-    });
 
-    eventSource.addEventListener('chunk', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.audio) {
-          playChunk(data.audio);
+      if (!response.body) {
+        throw new Error('No response body');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            const eventEnd = line.indexOf('\n');
+            const eventType = line.slice(6, eventEnd > 0 ? eventEnd : line.length).trim();
+            const dataStart = line.indexOf('data:');
+            if (dataStart > 0) {
+              const data = line.slice(dataStart + 5).trim();
+              try {
+                const parsed = JSON.parse(data);
+                
+                if (eventType === 'init') {
+                  console.log('Stream init received:', parsed);
+                  setInitData(parsed);
+                } else if (eventType === 'chunk') {
+                  if (parsed.audio) {
+                    playChunk(parsed.audio);
+                  }
+                } else if (eventType === 'playing') {
+                  console.log('Music started playing');
+                } else if (eventType === 'complete') {
+                  console.log('Stream complete');
+                } else if (eventType === 'error') {
+                  setError(parsed.error || 'Stream error');
+                  setIsStreaming(false);
+                }
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+              }
+            }
+          }
         }
-      } catch (err) {
-        console.error('Failed to play chunk:', err);
       }
-    });
-
-    eventSource.addEventListener('playing', () => {
-      console.log('Music started playing');
-    });
-
-    eventSource.addEventListener('complete', (e) => {
-      console.log('Stream complete');
+      
       setIsStreaming(false);
-    });
-
-    eventSource.addEventListener('error', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        setError(data.error || 'Stream error');
-      } catch (err) {
-        setError('Stream error');
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Stream aborted');
+      } else {
+        console.error('Stream error:', err);
+        setError(String(err));
       }
       setIsStreaming(false);
-      setIsPlaying(false);
-    });
-
-    fetch('/api/generate-music/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, seed, style, duration, bpm })
-    }).catch((err) => {
-      console.error('Failed to start stream:', err);
-      setError(String(err));
-      setIsStreaming(false);
-    });
+    }
   }, [playChunk]);
 
   const stopStream = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
     setIsStreaming(false);
     setIsPlaying(false);
@@ -169,8 +189,8 @@ export function useStreamingMusic(): UseStreamingMusicReturn {
 
   useEffect(() => {
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
       if (audioContextRef.current) {
         audioContextRef.current.close();

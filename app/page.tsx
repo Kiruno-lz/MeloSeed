@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
 import { Header } from '@/components/Header';
 import { Generator } from '@/components/features/Generator';
@@ -35,6 +35,12 @@ export default function Home() {
   const { address, isConnected } = useAccount();
   const [view, setView] = useState<'create' | 'collection'>('create');
   
+  // Streaming State - moved to parent to persist across component changes
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamInitData, setStreamInitData] = useState<MusicReadyData | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const nextStartTimeRef = useRef<number>(0);
+  
   // Generation State
   const [generatedData, setGeneratedData] = useState<CompleteMusicData | null>(null);
   const [title, setTitle] = useState('');
@@ -50,7 +56,195 @@ export default function Home() {
 
   const isPending = isUploading || isTxPending;
 
-  // Effect: Set metadata when new music is generated (all data from API)
+  // Audio decoding and playback functions
+  const initAudioContext = () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext({ sampleRate: 48000 });
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    }
+    return audioContextRef.current;
+  };
+
+  const decodeAudioChunk = (base64Data: string): Float32Array => {
+    const binaryString = atob(base64Data);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    const int16Array = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.length / 2);
+    const float32Array = new Float32Array(int16Array.length);
+    for (let i = 0; i < int16Array.length; i++) {
+      float32Array[i] = int16Array[i] / 32768;
+    }
+    
+    return float32Array;
+  };
+
+  const playChunk = (base64Audio: string) => {
+    const ctx = initAudioContext();
+    const floatData = decodeAudioChunk(base64Audio);
+    
+    const leftChannel = floatData;
+    const rightChannel = new Float32Array(floatData.length);
+    rightChannel.set(floatData);
+    
+    const interleaved = new Float32Array(leftChannel.length + rightChannel.length);
+    for (let i = 0; i < leftChannel.length; i++) {
+      interleaved[i * 2] = leftChannel[i];
+      interleaved[i * 2 + 1] = rightChannel[i];
+    }
+    
+    const audioBuffer = ctx.createBuffer(2, interleaved.length / 2, 48000);
+    audioBuffer.copyToChannel(leftChannel, 0);
+    audioBuffer.copyToChannel(rightChannel, 1);
+    
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ctx.destination);
+    
+    const currentTime = ctx.currentTime;
+    if (nextStartTimeRef.current < currentTime) {
+      nextStartTimeRef.current = currentTime + 0.1;
+    }
+    
+    source.start(nextStartTimeRef.current);
+    nextStartTimeRef.current += audioBuffer.duration;
+  };
+
+  // Start streaming function
+  const startStreaming = async (prompt: string, seed: number, style: string, duration: number, bpm: number) => {
+    setIsStreaming(true);
+    nextStartTimeRef.current = 0;
+
+    try {
+      const response = await fetch('/api/generate-music/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, seed, style, duration, bpm })
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error('Failed to start stream');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            const eventEnd = line.indexOf('\n');
+            const eventType = line.slice(6, eventEnd > 0 ? eventEnd : line.length).trim();
+            const dataStart = line.indexOf('data:');
+            if (dataStart > 0) {
+              const data = line.slice(dataStart + 5).trim();
+              try {
+                const parsed = JSON.parse(data);
+                
+                if (eventType === 'init') {
+                  console.log('Stream init received:', parsed);
+                  setStreamInitData(parsed);
+                  // Immediately show the player with initial data
+                  setGeneratedData({
+                    seed: parsed.seed,
+                    title: `MeloSeed #${parsed.seed}`,
+                    description: '',
+                    tags: [],
+                    mood: 'unknown',
+                    genre: 'unknown',
+                    coverUrl: null,
+                    styleMix: parsed.styleMix,
+                    seedHash: parsed.seedHash
+                  });
+                  
+                  // Start background title/cover generation
+                  if (parsed.styleMix && parsed.styleMix.length > 0) {
+                    Promise.all([
+                      fetch('/api/generate-title', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ styleMix: parsed.styleMix })
+                      }).then(res => res.json()).catch(console.error),
+                      
+                      fetch('/api/generate-cover-gemini', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          title: `MeloSeed #${parsed.seed}`,
+                          description: '',
+                          tags: [],
+                          mood: 'unknown',
+                          genre: 'unknown'
+                        })
+                      }).then(res => res.json()).catch(console.error)
+                    ]).then(([titleData, coverData]) => {
+                      setGeneratedData(prev => prev ? {
+                        ...prev,
+                        title: titleData?.title || prev.title,
+                        description: titleData?.description || '',
+                        tags: titleData?.tags || [],
+                        mood: titleData?.mood || 'unknown',
+                        genre: titleData?.genre || 'unknown',
+                        coverUrl: coverData?.coverUrl || null
+                      } : null);
+                    }).catch(err => {
+                      console.error('Background generation error:', err);
+                    });
+                  }
+                } else if (eventType === 'chunk') {
+                  if (parsed.audio) {
+                    playChunk(parsed.audio);
+                  }
+                } else if (eventType === 'playing') {
+                  console.log('Music started playing');
+                } else if (eventType === 'complete') {
+                  console.log('Stream complete');
+                } else if (eventType === 'error') {
+                  console.error('Stream error:', parsed.error);
+                }
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+              }
+            }
+          }
+        }
+      }
+      
+      setIsStreaming(false);
+    } catch (err) {
+      console.error('Stream error:', err);
+      setIsStreaming(false);
+    }
+  };
+
+  // Handle restart - stop streaming and reset
+  const handleRestart = () => {
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    setGeneratedData(null);
+    setStreamInitData(null);
+    setCoverUrl(null);
+    setTitle('');
+    setDescription('');
+  };
+
+  // Effect: Set metadata when new music is generated
   useEffect(() => {
     if (generatedData) {
       setTitle(generatedData.title);
@@ -58,16 +252,6 @@ export default function Home() {
       setCoverUrl(generatedData.coverUrl);
     }
   }, [generatedData]);
-
-  // Handle music ready - streaming started, show player
-  const handleMusicReady = (data: MusicReadyData) => {
-    // Streaming is handled by the hook in Generator, just update state
-  };
-
-  // Handle generation complete - update data
-  const handleGenerated = (data: CompleteMusicData) => {
-    setGeneratedData(data);
-  };
 
   // Effect: Handle Mint Errors
   useEffect(() => {
@@ -81,10 +265,7 @@ export default function Home() {
   useEffect(() => {
     if (isSuccess) {
       showToast('NFT Minted Successfully!', 'success');
-      setGeneratedData(null);
-      setCoverUrl(null);
-      setTitle('');
-      setDescription('');
+      handleRestart();
       setTimeout(() => {
           refetchCollection();
           setView('collection');
@@ -156,7 +337,7 @@ export default function Home() {
                     {!generatedData ? (
                         /* State 0: Generator Input */
                         <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                            <Generator onGenerated={handleGenerated} onMusicReady={handleMusicReady} />
+                            <Generator onGenerate={startStreaming} />
                         </div>
                     ) : (
                         /* State 1: Preview & Mint */
@@ -172,9 +353,7 @@ export default function Home() {
                                         seed={generatedData.seed}
                                         seedHash={generatedData.seedHash}
                                         styleMix={generatedData.styleMix}
-                                        onRestart={() => {
-                                          setGeneratedData(null);
-                                        }}
+                                        onRestart={handleRestart}
                                         className="sticky top-24"
                                     />
                                 )}
@@ -190,9 +369,7 @@ export default function Home() {
                                     setTitle={setTitle}
                                     description={description}
                                     setDescription={setDescription}
-                                    onRegenerate={() => {
-                                      setGeneratedData(null);
-                                    }}
+                                    onRegenerate={handleRestart}
                                     isAssetsReady={!!coverUrl}
                                 />
                             </div>
