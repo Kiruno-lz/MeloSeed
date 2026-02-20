@@ -1,11 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { GoogleGenAI } from '@google/genai';
 import { IMusicAnalyzer, IMusicAnalyzerWithCover, MusicAnalysisResult, CompleteMusicMetadata } from './types';
 import { uploadFileToIPFS } from '../ipfs-client';
 
 export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
   private client: GoogleGenerativeAI;
-  private imageClient: GoogleGenAI;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -13,7 +11,6 @@ export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
       throw new Error('GEMINI_API_KEY is not set');
     }
     this.client = new GoogleGenerativeAI(apiKey);
-    this.imageClient = new GoogleGenAI({ apiKey });
   }
 
   async analyze(audioData: ArrayBuffer): Promise<MusicAnalysisResult> {
@@ -89,7 +86,7 @@ Make the description feel human and emotionally resonant - like something you'd 
   }
 
   async generateCoverFromStyleMix(analysis: MusicAnalysisResult): Promise<string> {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.SILICON_FLOW_API_KEY;
     
     if (!apiKey) {
       return '/logo.png';
@@ -122,24 +119,35 @@ Make the description feel human and emotionally resonant - like something you'd 
 
       const coverPrompt = `Album cover art for "${analysis.title}". ${analysis.description}. Mood: ${analysis.mood}, Genre: ${analysis.genre}, Tags: ${analysis.tags.join(', ')}. Create a ${artisticStyle}. Use a color palette centered around ${selectedStyle.name} (#${selectedStyle.hex}). Aspect ratio 1:1. Style: highly artistic, emotionally evocative, modern digital art, professional album cover quality. Make it visually stunning and unique.`;
 
-      const response = await this.imageClient.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: coverPrompt,
-        config: {
-          responseModalities: ['TEXT', 'IMAGE'],
+      const response = await fetch('https://api.siliconflow.cn/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
         },
+        body: JSON.stringify({
+          model: 'Kwai-Kolors/Kolors',
+          prompt: coverPrompt,
+          image_size: '350x350',
+          batch_size: 1,
+          num_inference_steps: 20,
+          guidance_scale: 7.5
+        })
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Silicon Flow API error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
       
-      for (const candidate of response.candidates || []) {
-        for (const part of candidate.content?.parts || []) {
-          if (part.inlineData) {
-            const imageData = part.inlineData.data;
-            const buffer = Buffer.from(imageData, 'base64');
-            const blob = new Blob([buffer], { type: 'image/png' });
-            const coverUrl = await uploadFileToIPFS(blob);
-            return coverUrl;
-          }
-        }
+      if (result.data && result.data[0]?.image) {
+        const imageBase64 = result.data[0].image;
+        const buffer = Buffer.from(imageBase64, 'base64');
+        const blob = new Blob([buffer], { type: 'image/png' });
+        const coverUrl = await uploadFileToIPFS(blob);
+        return coverUrl;
       }
 
       return '/logo.png';

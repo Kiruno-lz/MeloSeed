@@ -181,12 +181,12 @@ export function StreamingPlayer({
         <div className="absolute -inset-4 bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-fuchsia-500/10 opacity-0 group-hover:opacity-100 blur-2xl transition-all duration-700" />
         
         <div className="relative bg-gradient-to-b from-zinc-900 to-black rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
-          <div className="relative aspect-square overflow-hidden">
+          <div className="relative aspect-square overflow-hidden rounded-full p-6">
             {coverUrl ? (
               <img 
                 src={coverUrl} 
                 alt={title}
-                className="w-full h-full object-cover transition-transform duration-[2s]"
+                className="w-full h-full object-cover transition-transform duration-[2s] rounded-full"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/40 via-purple-900/30 to-zinc-900">
@@ -205,7 +205,7 @@ export function StreamingPlayer({
               </div>
             )}
 
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+            <div className="absolute inset-6 bg-gradient-to-t from-black/60 to-transparent rounded-full" />
           </div>
 
           <div className="p-5 space-y-4">
