@@ -117,108 +117,136 @@ export default function Home() {
 
   // Start streaming function
   const startStreaming = async (prompt: string, seed: number, style: string, duration: number, bpm: number) => {
+    console.log('startStreaming called with seed:', seed);
     setIsStreaming(true);
     nextStartTimeRef.current = 0;
 
     try {
+      console.log('Fetching stream...');
       const response = await fetch('/api/generate-music/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, seed, style, duration, bpm })
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error('Failed to start stream');
+      console.log('Response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`Failed to start stream: ${response.status} ${response.statusText}`);
+      }
+      
+      if (!response.body) {
+        throw new Error('No response body');
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let hasReceivedInit = false;
 
       while (true) {
         const { done, value } = await reader.read();
         
-        if (done) break;
+        if (done) {
+          console.log('Stream reading done, hasReceivedInit:', hasReceivedInit);
+          break;
+        }
         
-        buffer += decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
         
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        // Parse SSE format: each event ends with double newline
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
         
-        for (const line of lines) {
-          if (line.startsWith('event:')) {
-            const eventEnd = line.indexOf('\n');
-            const eventType = line.slice(6, eventEnd > 0 ? eventEnd : line.length).trim();
-            const dataStart = line.indexOf('data:');
-            if (dataStart > 0) {
-              const data = line.slice(dataStart + 5).trim();
-              try {
-                const parsed = JSON.parse(data);
+        for (const event of events) {
+          if (!event.trim()) continue;
+          
+          const lines = event.split('\n');
+          let eventType = '';
+          let eventData = '';
+          
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              eventType = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+              eventData = line.slice(5).trim();
+            }
+          }
+          
+          console.log('Received event:', eventType, 'data length:', eventData.length);
+          
+          if (eventType && eventData) {
+            try {
+              const parsed = JSON.parse(eventData);
+              
+              if (eventType === 'init') {
+                hasReceivedInit = true;
+                console.log('Stream init received, setting generatedData, seed:', parsed.seed);
+                setStreamInitData(parsed);
+                // Immediately show the player with initial data
+                setGeneratedData({
+                  seed: parsed.seed,
+                  title: `MeloSeed #${parsed.seed}`,
+                  description: '',
+                  tags: [],
+                  mood: 'unknown',
+                  genre: 'unknown',
+                  coverUrl: null,
+                  styleMix: parsed.styleMix,
+                  seedHash: parsed.seedHash
+                });
+                console.log('generatedData set successfully');
                 
-                if (eventType === 'init') {
-                  console.log('Stream init received:', parsed);
-                  setStreamInitData(parsed);
-                  // Immediately show the player with initial data
-                  setGeneratedData({
-                    seed: parsed.seed,
-                    title: `MeloSeed #${parsed.seed}`,
-                    description: '',
-                    tags: [],
-                    mood: 'unknown',
-                    genre: 'unknown',
-                    coverUrl: null,
-                    styleMix: parsed.styleMix,
-                    seedHash: parsed.seedHash
+                // Start background title/cover generation
+                if (parsed.styleMix && parsed.styleMix.length > 0) {
+                  Promise.all([
+                    fetch('/api/generate-title', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ styleMix: parsed.styleMix })
+                    }).then(res => res.json()).catch(console.error),
+                    
+                    fetch('/api/generate-cover-gemini', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        title: `MeloSeed #${parsed.seed}`,
+                        description: '',
+                        tags: [],
+                        mood: 'unknown',
+                        genre: 'unknown'
+                      })
+                    }).then(res => res.json()).catch(console.error)
+                  ]).then(([titleData, coverData]) => {
+                    setGeneratedData(prev => prev ? {
+                      ...prev,
+                      title: titleData?.title || prev.title,
+                      description: titleData?.description || '',
+                      tags: titleData?.tags || [],
+                      mood: titleData?.mood || 'unknown',
+                      genre: titleData?.genre || 'unknown',
+                      coverUrl: coverData?.coverUrl || null
+                    } : null);
+                  }).catch(err => {
+                    console.error('Background generation error:', err);
                   });
-                  
-                  // Start background title/cover generation
-                  if (parsed.styleMix && parsed.styleMix.length > 0) {
-                    Promise.all([
-                      fetch('/api/generate-title', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ styleMix: parsed.styleMix })
-                      }).then(res => res.json()).catch(console.error),
-                      
-                      fetch('/api/generate-cover-gemini', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          title: `MeloSeed #${parsed.seed}`,
-                          description: '',
-                          tags: [],
-                          mood: 'unknown',
-                          genre: 'unknown'
-                        })
-                      }).then(res => res.json()).catch(console.error)
-                    ]).then(([titleData, coverData]) => {
-                      setGeneratedData(prev => prev ? {
-                        ...prev,
-                        title: titleData?.title || prev.title,
-                        description: titleData?.description || '',
-                        tags: titleData?.tags || [],
-                        mood: titleData?.mood || 'unknown',
-                        genre: titleData?.genre || 'unknown',
-                        coverUrl: coverData?.coverUrl || null
-                      } : null);
-                    }).catch(err => {
-                      console.error('Background generation error:', err);
-                    });
-                  }
-                } else if (eventType === 'chunk') {
-                  if (parsed.audio) {
-                    playChunk(parsed.audio);
-                  }
-                } else if (eventType === 'playing') {
-                  console.log('Music started playing');
-                } else if (eventType === 'complete') {
-                  console.log('Stream complete');
-                } else if (eventType === 'error') {
-                  console.error('Stream error:', parsed.error);
                 }
-              } catch (e) {
-                console.error('Failed to parse SSE data:', e);
+              } else if (eventType === 'chunk') {
+                if (parsed.audio) {
+                  playChunk(parsed.audio);
+                }
+              } else if (eventType === 'playing') {
+                console.log('Music started playing');
+              } else if (eventType === 'complete') {
+                console.log('Stream complete');
+              } else if (eventType === 'error') {
+                console.error('Stream error:', parsed.error);
               }
+            } catch (e) {
+              console.error('Failed to parse SSE data:', e);
             }
           }
         }

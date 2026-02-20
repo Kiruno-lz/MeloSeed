@@ -49,12 +49,6 @@ export function Generator({ onGenerate }: GeneratorProps) {
       15,
       80
     );
-    
-    setTimeout(() => {
-      setLoading(false);
-      setStage('idle');
-      setSeed(Math.floor(Math.random() * 1000000));
-    }, 100);
   };
 
   return (
