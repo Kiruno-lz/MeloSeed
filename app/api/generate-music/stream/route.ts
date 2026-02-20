@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { GoogleGenAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { SeedToStyleMapper, DEFAULT_STYLES, seedToHash } from '@/lib/seed-mapper';
 
 export async function POST(req: NextRequest) {
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
           console.log('🎵 Style Mix:', weightedPrompts.map(p => `${p.text}:${Math.round(p.weight*100)}%`).join(' | '));
           console.log('🔊 Starting Lyria RealTime streaming...');
 
-          const client = new GoogleGenAI({ apiKey, apiVersion: 'v1alpha' });
+          const client = new GoogleGenAI({ apiKey: apiKey });
           const model = 'models/lyria-realtime-exp';
           const audioChunks: Uint8Array[] = [];
 

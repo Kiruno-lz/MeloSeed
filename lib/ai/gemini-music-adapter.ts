@@ -13,7 +13,7 @@ export class GeminiMusicAdapter implements IMusicGenerator {
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY is not set');
     }
-    this.client = new GoogleGenAI({ apiKey, apiVersion: 'v1alpha' });
+    this.client = new GoogleGenAI({ apiKey });
   }
 
   async generate(options: MusicGenerationOptions): Promise<MusicGenerationResult> {
