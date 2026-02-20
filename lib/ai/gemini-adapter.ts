@@ -88,7 +88,10 @@ Make the description feel human and emotionally resonant - like something you'd 
   async generateCoverFromStyleMix(analysis: MusicAnalysisResult): Promise<string> {
     const apiKey = process.env.SILICON_FLOW_API_KEY;
     
+    console.log('SILICON_FLOW_API_KEY present:', !!apiKey);
+    
     if (!apiKey) {
+      console.warn('SILICON_FLOW_API_KEY not set, using default cover');
       return '/logo.png';
     }
 
@@ -141,7 +144,12 @@ Make the description feel human and emotionally resonant - like something you'd 
       }
 
       const result = await response.json();
+      console.log('Silicon Flow response:', JSON.stringify(result));
       
+      if (result.data && result.data[0]?.url) {
+        return result.data[0].url;
+      }
+
       if (result.data && result.data[0]?.image) {
         const imageBase64 = result.data[0].image;
         const buffer = Buffer.from(imageBase64, 'base64');

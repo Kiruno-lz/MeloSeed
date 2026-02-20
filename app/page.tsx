@@ -5,7 +5,9 @@ import { useAccount, useWriteContract } from 'wagmi';
 import { Header } from '@/components/Header';
 import { Generator } from '@/components/features/Generator';
 import { StreamingPlayer } from '@/components/features/StreamingPlayer';
+import { BackgroundVisualizer } from '@/components/features/BackgroundVisualizer';
 import { MintingCard } from '@/components/features/MintingCard';
+import { NFTPlayer } from '@/components/features/NFTPlayer';
 import { useToast } from '@/components/Toast';
 import { uploadFileToIPFS, uploadJSONToIPFS } from '@/lib/ipfs-client';
 import { useMyCollection } from '@/lib/hooks/useMyCollection';
@@ -303,18 +305,55 @@ export default function Home() {
 
   // Handle restart - stop streaming and reset
   const handleRestart = () => {
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
+    stopAllAudio();
+    setIsStreaming(false);
     setGeneratedData(null);
     setStreamInitData(null);
     setCoverUrl(null);
     setTitle('');
     setDescription('');
-    setIsPlaying(false);
-    isPlayingRef.current = false;
   };
+
+  const stopAllAudio = useCallback(() => {
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+    
+    if (gainNodeRef.current && audioContextRef.current) {
+      gainNodeRef.current.gain.setValueAtTime(0, audioContextRef.current.currentTime);
+    }
+    
+    activeSourcesRef.current.forEach(source => {
+      try {
+        source.stop();
+      } catch (e) {}
+    });
+    activeSourcesRef.current = [];
+    nextStartTimeRef.current = 0;
+    
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+      gainNodeRef.current = null;
+    }
+  }, []);
+
+  // Effect: Handle view changes - stop audio when leaving streaming view
+  useEffect(() => {
+    if (view !== 'create' && isStreaming) {
+      // User navigated away from create view - stop all audio
+      stopAllAudio();
+      setIsStreaming(false);
+    } else if (view === 'create' && !generatedData) {
+      // User returned to create view with no generated data - reset everything
+      stopAllAudio();
+      setIsStreaming(false);
+      setGeneratedData(null);
+      setStreamInitData(null);
+      setCoverUrl(null);
+      setTitle('');
+      setDescription('');
+    }
+  }, [view, isStreaming, generatedData, stopAllAudio]);
 
   // Effect: Set metadata when new music is generated
   useEffect(() => {
@@ -398,6 +437,11 @@ export default function Home() {
 
   return (
     <div className="min-h-screen pb-20 pt-24 px-4 relative overflow-x-hidden flex flex-col">
+        <BackgroundVisualizer 
+          audioContextRef={audioContextRef}
+          isPlaying={isPlaying && isStreaming}
+          styleMix={generatedData?.styleMix}
+        />
         <Header currentView={view} setView={setView} />
         
         <main className="container max-w-6xl mx-auto flex-1 flex flex-col justify-center">

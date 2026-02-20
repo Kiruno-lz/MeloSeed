@@ -180,7 +180,7 @@ export function StreamingPlayer({
       <div className="relative">
         <div className="absolute -inset-4 bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-fuchsia-500/10 opacity-0 group-hover:opacity-100 blur-2xl transition-all duration-700" />
         
-        <div className="relative bg-gradient-to-b from-zinc-900 to-black rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
+        <div className="relative bg-gradient-to-b from-zinc-900/95 to-black/95 dark:from-zinc-900/95 dark:to-black/95 rounded-3xl overflow-hidden border border-white/10 dark:border-white/10 border-white/20 shadow-2xl">
           <div className="relative aspect-square overflow-hidden rounded-full p-6">
             {coverUrl ? (
               <img 
@@ -189,17 +189,17 @@ export function StreamingPlayer({
                 className="w-full h-full object-cover transition-transform duration-[2s] rounded-full"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/40 via-purple-900/30 to-zinc-900">
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/40 via-purple-900/30 to-zinc-900 dark:from-violet-900/40 dark:via-purple-900/30 dark:to-zinc-900">
                 <div className={cn(
                   "relative w-40 h-40 transition-transform duration-500",
                   isPlaying && "animate-[spin_8s_linear_infinite]"
                 )}>
                   <div className="absolute inset-0 rounded-full bg-gradient-to-br from-violet-600 to-purple-900 shadow-2xl" />
-                  <div className="absolute inset-4 rounded-full bg-zinc-900 flex items-center justify-center">
+                  <div className="absolute inset-4 rounded-full bg-zinc-900 dark:bg-zinc-900 flex items-center justify-center">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500" />
                   </div>
-                  <div className="absolute inset-0 rounded-full border-2 border-white/10" style={{ padding: '8px' }}>
-                    <div className="w-full h-full rounded-full border border-white/5 border-dashed" />
+                  <div className="absolute inset-0 rounded-full border-2 border-white/10 dark:border-white/10 border-white/30" style={{ padding: '8px' }}>
+                    <div className="w-full h-full rounded-full border border-white/5 dark:border-white/5 border-white/20 border-dashed" />
                   </div>
                 </div>
               </div>
@@ -210,21 +210,21 @@ export function StreamingPlayer({
 
           <div className="p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 dark:bg-white/5 rounded-full border border-white/10 dark:border-white/10">
                 <Radio className="w-3 h-3 text-violet-400 animate-pulse" />
                 <span className="text-xs font-medium text-violet-300">LIVE</span>
               </div>
               
               {seed !== undefined && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-800/80 rounded-full border border-white/10">
-                  <Hash className="w-3 h-3 text-zinc-400" />
-                  <span className="text-xs font-mono text-zinc-300">{seed}</span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-800/80 dark:bg-zinc-800/80 rounded-full border border-white/10 dark:border-white/10">
+                  <Hash className="w-3 h-3 text-zinc-400 dark:text-zinc-400" />
+                  <span className="text-xs font-mono text-zinc-300 dark:text-zinc-300">{seed}</span>
                 </div>
               )}
             </div>
 
             <div>
-              <h2 className="text-lg font-bold text-white truncate leading-tight">{title}</h2>
+              <h2 className="text-lg font-bold text-white dark:text-white truncate leading-tight">{title}</h2>
               {seedHash && (
                 <code className="text-xs font-mono text-violet-400/60 mt-1 block truncate">
                   {seedHash}
@@ -232,7 +232,7 @@ export function StreamingPlayer({
               )}
             </div>
 
-            <div className="h-12 w-full rounded-lg overflow-hidden bg-zinc-900/50 border border-white/5 relative">
+            <div className="h-12 w-full rounded-lg overflow-hidden bg-zinc-900/50 dark:bg-zinc-900/50 border border-white/5 dark:border-white/5 relative">
               <canvas 
                 ref={canvasRef}
                 width={320}
@@ -240,7 +240,7 @@ export function StreamingPlayer({
                 className="w-full h-full"
               />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-xs text-white/20 font-mono">{formatTime(currentTime)}</span>
+                <span className="text-xs text-white/20 dark:text-white/20 font-mono">{formatTime(currentTime)}</span>
               </div>
             </div>
 
