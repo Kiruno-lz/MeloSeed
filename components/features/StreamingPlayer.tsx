@@ -21,6 +21,7 @@ interface StreamingPlayerProps {
   styleMix?: StyleMixItem[];
   onRestart?: () => void;
   className?: string;
+  autoPlay?: boolean;
 }
 
 export function StreamingPlayer({
@@ -32,7 +33,8 @@ export function StreamingPlayer({
   seedHash,
   styleMix = [],
   onRestart,
-  className
+  className,
+  autoPlay = false
 }: StreamingPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -46,8 +48,11 @@ export function StreamingPlayer({
     if (!audioRef.current && audioSrc) {
       audioRef.current = new Audio(audioSrc);
       audioRef.current.loop = true;
+      if (autoPlay) {
+        audioRef.current.play().catch(console.error);
+      }
     }
-  }, [audioSrc]);
+  }, [audioSrc, autoPlay]);
 
   useEffect(() => {
     if (!audioRef.current) return;

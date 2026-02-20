@@ -20,11 +20,19 @@ interface CompleteMusicData {
 
 interface GeneratorProps {
   onGenerated: (data: CompleteMusicData) => void;
+  onMusicReady?: (data: MusicOnlyData) => void;
+}
+
+interface MusicOnlyData {
+  seed: number;
+  audioBase64: string;
+  styleMix?: { name: string; weight: number; color: string }[];
+  seedHash?: string;
 }
 
 type GenerationStage = 'idle' | 'generating' | 'analyzing' | 'cover' | 'complete';
 
-export function Generator({ onGenerated }: GeneratorProps) {
+export function Generator({ onGenerated, onMusicReady }: GeneratorProps) {
   const [prompt, setPrompt] = useState('');
   const [seed, setSeed] = useState(Math.floor(Math.random() * 1000000));
   const [loading, setLoading] = useState(false);
@@ -68,7 +76,7 @@ export function Generator({ onGenerated }: GeneratorProps) {
     setStage('generating');
     
     try {
-      const res = await fetch('/api/generate', {
+      const res = await fetch('/api/generate-music', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -80,24 +88,69 @@ export function Generator({ onGenerated }: GeneratorProps) {
         }),
       });
 
-      if (!res.ok) throw new Error('Generation failed');
+      if (!res.ok) throw new Error('Music generation failed');
 
-      const data = await res.json();
+      const musicData = await res.json();
       
+      const partialData: CompleteMusicData = {
+        seed: Number(musicData.seed),
+        audioBase64: musicData.audioBase64,
+        title: `MeloSeed #${musicData.seed}`,
+        description: '',
+        tags: [],
+        mood: 'unknown',
+        genre: 'unknown',
+        coverUrl: null,
+        styleMix: musicData.styleMix || [],
+        seedHash: musicData.seedHash || ''
+      };
+
+      if (onMusicReady) {
+        onMusicReady({
+          seed: partialData.seed,
+          audioBase64: partialData.audioBase64,
+          styleMix: partialData.styleMix,
+          seedHash: partialData.seedHash
+        });
+      }
+
       setStage('complete');
-      
-      onGenerated({ 
-        seed: Number(data.seed), 
-        audioBase64: data.audioBase64,
-        title: data.title || `MeloSeed #${data.seed}`,
-        description: data.description || '',
-        tags: data.tags || [],
-        mood: data.mood || 'unknown',
-        genre: data.genre || 'unknown',
-        coverUrl: data.coverUrl || null,
-        styleMix: data.styleMix || [],
-        seedHash: data.seedHash || ''
-      });
+      onGenerated(partialData);
+
+      if (musicData.styleMix && musicData.styleMix.length > 0) {
+        Promise.all([
+          fetch('/api/generate-title', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ styleMix: musicData.styleMix })
+          }).then(res => res.json()).catch(console.error),
+          
+          fetch('/api/generate-cover-gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: partialData.title,
+              description: '',
+              tags: [],
+              mood: 'unknown',
+              genre: 'unknown'
+            })
+          }).then(res => res.json()).catch(console.error)
+        ]).then(([titleData, coverData]) => {
+          const updatedData: CompleteMusicData = {
+            ...partialData,
+            title: titleData?.title || partialData.title,
+            description: titleData?.description || '',
+            tags: titleData?.tags || [],
+            mood: titleData?.mood || 'unknown',
+            genre: titleData?.genre || 'unknown',
+            coverUrl: coverData?.coverUrl || null
+          };
+          onGenerated(updatedData);
+        }).catch(err => {
+          console.error('Background generation error:', err);
+        });
+      }
       
       setSeed(Math.floor(Math.random() * 1000000));
     } catch (err) {

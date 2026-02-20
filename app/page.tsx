@@ -25,12 +25,21 @@ interface CompleteMusicData {
   seedHash?: string;
 }
 
+interface MusicOnlyData {
+  seed: number;
+  audioBase64: string;
+  styleMix?: { name: string; weight: number; color: string }[];
+  seedHash?: string;
+}
+
 export default function Home() {
   const { address, isConnected } = useAccount();
   const [view, setView] = useState<'create' | 'collection'>('create');
   
   // Generation State
   const [generatedData, setGeneratedData] = useState<CompleteMusicData | null>(null);
+  const [musicData, setMusicData] = useState<MusicOnlyData | null>(null);
+  const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -53,6 +62,20 @@ export default function Home() {
     }
   }, [generatedData]);
 
+  // Handle music ready - trigger auto-play
+  const handleMusicReady = (data: MusicOnlyData) => {
+    setMusicData(data);
+    setShouldAutoPlay(true);
+  };
+
+  // Handle generation complete - update data and trigger auto-play on first call
+  const handleGenerated = (data: CompleteMusicData) => {
+    if (!generatedData) {
+      setShouldAutoPlay(true);
+    }
+    setGeneratedData(data);
+  };
+
   // Effect: Handle Mint Errors
   useEffect(() => {
     if (error) {
@@ -66,6 +89,8 @@ export default function Home() {
     if (isSuccess) {
       showToast('NFT Minted Successfully!', 'success');
       setGeneratedData(null);
+      setMusicData(null);
+      setShouldAutoPlay(false);
       setCoverUrl(null);
       setTitle('');
       setDescription('');
@@ -140,7 +165,7 @@ export default function Home() {
                     {!generatedData ? (
                         /* State 0: Generator Input */
                         <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                            <Generator onGenerated={setGeneratedData} />
+                            <Generator onGenerated={handleGenerated} onMusicReady={handleMusicReady} />
                         </div>
                     ) : (
                         /* State 1: Preview & Mint */
@@ -156,7 +181,12 @@ export default function Home() {
                                         seed={generatedData.seed}
                                         seedHash={generatedData.seedHash}
                                         styleMix={generatedData.styleMix}
-                                        onRestart={() => setGeneratedData(null)}
+                                        onRestart={() => {
+                                          setGeneratedData(null);
+                                          setMusicData(null);
+                                          setShouldAutoPlay(false);
+                                        }}
+                                        autoPlay={shouldAutoPlay}
                                         className="sticky top-24"
                                     />
                                 )}
@@ -172,7 +202,11 @@ export default function Home() {
                                     setTitle={setTitle}
                                     description={description}
                                     setDescription={setDescription}
-                                    onRegenerate={() => setGeneratedData(null)}
+                                    onRegenerate={() => {
+                                      setGeneratedData(null);
+                                      setMusicData(null);
+                                      setShouldAutoPlay(false);
+                                    }}
                                     isAssetsReady={!!coverUrl}
                                 />
                             </div>
