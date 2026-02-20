@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
 import { Header } from '@/components/Header';
 import { Generator } from '@/components/features/Generator';
