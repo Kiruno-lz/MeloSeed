@@ -26,14 +26,17 @@ export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
 
       const base64Audio = this.arrayBufferToBase64(audioData);
       
-      const prompt = `You are a music expert. Please analyze this audio and provide:
-1. A creative and catchy title (in English, max 10 words)
-2. A detailed description of the music (2-3 sentences)
-3. 5 relevant tags (comma separated)
-4. The mood (e.g., happy, melancholic, energetic, calm)
-5. The genre (e.g., lo-fi, electronic, classical, jazz)
+      const prompt = `You are a poetic music curator with an evocative writing style. Analyze this audio and create:
 
-Respond in JSON format with keys: title, description, tags, mood, genre`;
+1. TITLE: A captivating, poetic title (max 10 words, English) that captures the essence of the music
+2. DESCRIPTION: Write a vivid, atmospheric description (2-3 sentences) that paints a picture and evokes emotions. Make it feel like a personal note to someone special - intimate, poetic, and moving. Use sensory language about what the music feels like, what memories it evokes, or what emotions it stirs. Avoid generic AI-sounding phrases.
+3. TAGS: 5 relevant tags (comma separated)
+4. MOOD: The emotional atmosphere (e.g., dreamy, melancholic, hopeful, nostalgic, serene)
+5. GENRE: The music style (e.g., lo-fi, ambient, electronic, classical, jazz)
+
+Respond in JSON format with keys: title, description, tags, mood, genre
+
+Make the description feel human and emotionally resonant - like something you'd write in a personal message to share this music with someone you care about.`;
 
       const result = await model.generateContent([
         {
@@ -173,20 +176,20 @@ Create a beautiful, abstract, minimalistic album cover art with harmonious color
 
   private getMockAnalysis(): MusicAnalysisResult {
     return {
-      title: 'Midnight Dreams',
-      description: 'A soothing lo-fi track with soft piano melodies and gentle beats, perfect for relaxation and focus.',
-      tags: ['lo-fi', 'chill', 'piano', 'relaxing', 'ambient'],
-      mood: 'calm',
+      title: 'Starlight Lullaby',
+      description: 'Like drifting through a quiet midnight sky, this gentle melody wraps you in warmth and nostalgia - a tender moment of peace between friends, where silence speaks louder than words.',
+      tags: ['lo-fi', 'chill', 'piano', 'dreams', 'serene'],
+      mood: 'dreamy',
       genre: 'lo-fi'
     };
   }
 
   private getMockCompleteMetadata(): CompleteMusicMetadata {
     return {
-      title: 'Midnight Dreams',
-      description: 'A soothing lo-fi track with soft piano melodies and gentle beats, perfect for relaxation and focus.',
-      tags: ['lo-fi', 'chill', 'piano', 'relaxing', 'ambient'],
-      mood: 'calm',
+      title: 'Starlight Lullaby',
+      description: 'Like drifting through a quiet midnight sky, this gentle melody wraps you in warmth and nostalgia - a tender moment of peace between friends, where silence speaks louder than words.',
+      tags: ['lo-fi', 'chill', 'piano', 'dreams', 'serene'],
+      mood: 'dreamy',
       genre: 'lo-fi',
       coverUrl: '/logo.png'
     };
