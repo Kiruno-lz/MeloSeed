@@ -118,16 +118,7 @@ export class GeminiMusicAdapter implements IMusicGenerator {
               : [{ text: prompt, weight: 1.0 }]
           });
 
-          await session.setMusicGenerationConfig({
-            musicGenerationConfig: {
-              bpm: bpm || 80,
-              temperature: 0.8,
-              density: 0.6,
-              brightness: 0.5,
-            }
-          });
-
-          await session.play();
+          session.play();
 
           setTimeout(async () => {
             try {

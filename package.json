@@ -19,7 +19,7 @@
     "node": ">=18.17.0"
   },
   "dependencies": {
-    "@google/genai": "^1.42.0",
+    "@google/genai": "^1.0.0",
     "@google/generative-ai": "^0.24.1",
     "@openzeppelin/contracts": "^5.4.0",
     "@radix-ui/react-label": "^2.1.8",
