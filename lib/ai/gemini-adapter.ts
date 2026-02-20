@@ -290,6 +290,8 @@ Respond in JSON format with keys: title, description, tags, mood, genre`;
       genre: 'ambient'
     };
   }
+
+  private getMockAnalysis(): MusicAnalysisResult {
     return {
       title: 'Starlight Lullaby',
       description: 'Like drifting through a quiet midnight sky, this gentle melody wraps you in warmth and nostalgia - a tender moment of peace between friends, where silence speaks louder than words.',
