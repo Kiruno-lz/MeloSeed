@@ -10,10 +10,18 @@ export interface MusicGenerationOptions {
   bpm?: number;
 }
 
+export interface StyleMixItem {
+  name: string;
+  weight: number;
+  color: string;
+}
+
 export interface MusicGenerationResult {
   audioBase64: string;
   audioFormat: string;
   seed: number;
+  styleMix?: StyleMixItem[];
+  seedHash?: string;
 }
 
 export interface IMusicAnalyzer {

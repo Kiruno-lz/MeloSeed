@@ -47,7 +47,9 @@ export async function POST(req: NextRequest) {
       tags: metadata.tags,
       mood: metadata.mood,
       genre: metadata.genre,
-      coverUrl: metadata.coverUrl
+      coverUrl: metadata.coverUrl,
+      styleMix: generationResult.styleMix,
+      seedHash: generationResult.seedHash
     });
 
   } catch (error) {

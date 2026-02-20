@@ -94,7 +94,9 @@ export function Generator({ onGenerated }: GeneratorProps) {
         tags: data.tags || [],
         mood: data.mood || 'unknown',
         genre: data.genre || 'unknown',
-        coverUrl: data.coverUrl || null
+        coverUrl: data.coverUrl || null,
+        styleMix: data.styleMix || [],
+        seedHash: data.seedHash || ''
       });
       
       setSeed(Math.floor(Math.random() * 1000000));

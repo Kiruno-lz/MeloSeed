@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
 import { Header } from '@/components/Header';
 import { Generator } from '@/components/features/Generator';
-import { NFTPlayer } from '@/components/features/NFTPlayer';
+import { StreamingPlayer } from '@/components/features/StreamingPlayer';
 import { MintingCard } from '@/components/features/MintingCard';
 import { useToast } from '@/components/Toast';
-import { uploadFileToIPFS, uploadJSONToIPFS, base64ToBlob } from '@/lib/ipfs-client';
+import { uploadFileToIPFS, uploadJSONToIPFS } from '@/lib/ipfs-client';
 import { useMyCollection } from '@/lib/hooks/useMyCollection';
 import { CONTRACT_ADDRESS, MELO_SEED_ABI } from '@/lib/constants';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
@@ -21,6 +21,8 @@ interface CompleteMusicData {
   mood: string;
   genre: string;
   coverUrl: string | null;
+  styleMix?: { name: string; weight: number; color: string }[];
+  seedHash?: string;
 }
 
 export default function Home() {
@@ -74,48 +76,39 @@ export default function Home() {
     }
   }, [isSuccess, showToast, refetchCollection]);
 
-  // Handle Mint
+  // Handle Mint - returns empty blob for audio since it's streaming
   const handleMint = async () => {
     if (!generatedData) return;
     
-    // Check wallet connection ONLY when minting
     if (!isConnected || !address) {
         showToast("Please connect your wallet to mint.", "error");
         return;
     }
 
-    // Check if assets are ready - now all assets are ready from the start
-    if (!generatedData.audioBase64 || !coverUrl) {
-        showToast("Assets are not ready yet. Please wait...", "error");
+    if (!coverUrl) {
+        showToast("Cover image is not ready yet. Please wait...", "error");
         return;
     }
     
     setIsUploading(true);
     try {
-        const audioBlob = base64ToBlob(generatedData.audioBase64);
-        const audioURI = await uploadFileToIPFS(audioBlob);
-
         let imageURI = "";
-        if (coverUrl) {
-            const coverRes = await fetch(coverUrl);
-            const coverBlob = await coverRes.blob();
-            imageURI = await uploadFileToIPFS(coverBlob);
-        } else {
-            const coverRes = await fetch('/logo.png');
-            const coverBlob = await coverRes.blob();
-            imageURI = await uploadFileToIPFS(coverBlob); 
-        }
+        const coverRes = await fetch(coverUrl);
+        const coverBlob = await coverRes.blob();
+        imageURI = await uploadFileToIPFS(coverBlob);
 
         const metadata = {
             name: title,
             description: description, 
             image: imageURI,
-            animation_url: audioURI,
+            animation_url: "",
             attributes: [
                 { trait_type: "Seed", value: generatedData.seed.toString() },
+                { trait_type: "SeedHash", value: generatedData.seedHash || '' },
                 { trait_type: "Mood", value: generatedData.mood },
                 { trait_type: "Genre", value: generatedData.genre },
-                { trait_type: "Tags", value: generatedData.tags.join(', ') }
+                { trait_type: "Tags", value: generatedData.tags.join(', ') },
+                { trait_type: "StyleMix", value: (generatedData.styleMix || []).map(s => `${s.name}:${Math.round(s.weight*100)}%`).join('; ') }
             ]
         };
         const tokenURI = await uploadJSONToIPFS(metadata);
@@ -152,17 +145,18 @@ export default function Home() {
                     ) : (
                         /* State 1: Preview & Mint */
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start mt-8">
-                            {/* Left: Preview Player */}
+                            {/* Left: Streaming Player */}
                             <div className="order-1 lg:col-start-1 lg:row-start-1 w-full">
                                 {generatedData && (
-                                    <NFTPlayer 
-                                        previewData={{
-                                            audioSrc: `data:audio/mp3;base64,${generatedData.audioBase64}`,
-                                            coverImage: coverUrl,
-                                            title: title || `MeloSeed #${generatedData.seed}`,
-                                            description: description,
-                                            seed: generatedData.seed
-                                        }}
+                                    <StreamingPlayer 
+                                        audioBase64={generatedData.audioBase64}
+                                        coverUrl={coverUrl}
+                                        title={title || `MeloSeed #${generatedData.seed}`}
+                                        description={description}
+                                        seed={generatedData.seed}
+                                        seedHash={generatedData.seedHash}
+                                        styleMix={generatedData.styleMix}
+                                        onRestart={() => setGeneratedData(null)}
                                         className="sticky top-24"
                                     />
                                 )}
@@ -179,7 +173,7 @@ export default function Home() {
                                     description={description}
                                     setDescription={setDescription}
                                     onRegenerate={() => setGeneratedData(null)}
-                                    isAssetsReady={!!generatedData?.audioBase64 && !!coverUrl}
+                                    isAssetsReady={!!coverUrl}
                                 />
                             </div>
                         </div>
