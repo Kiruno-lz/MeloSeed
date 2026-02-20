@@ -42,6 +42,8 @@ export default function Home() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const isPlayingRef = useRef(false);
+  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const gainNodeRef = useRef<GainNode | null>(null);
   
   // Generation State
   const [generatedData, setGeneratedData] = useState<CompleteMusicData | null>(null);
@@ -62,6 +64,8 @@ export default function Home() {
   const initAudioContext = () => {
     if (!audioContextRef.current) {
       audioContextRef.current = new AudioContext({ sampleRate: 48000 });
+      gainNodeRef.current = audioContextRef.current.createGain();
+      gainNodeRef.current.connect(audioContextRef.current.destination);
     }
     if (audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume();
@@ -87,8 +91,6 @@ export default function Home() {
   };
 
   const playChunk = (base64Audio: string) => {
-    if (!isPlayingRef.current) return;
-    
     const ctx = initAudioContext();
     const floatData = decodeAudioChunk(base64Audio);
     
@@ -108,7 +110,12 @@ export default function Home() {
     
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
-    source.connect(ctx.destination);
+    
+    if (gainNodeRef.current) {
+      source.connect(gainNodeRef.current);
+    } else {
+      source.connect(ctx.destination);
+    }
     
     const currentTime = ctx.currentTime;
     if (nextStartTimeRef.current < currentTime) {
@@ -117,11 +124,35 @@ export default function Home() {
     
     source.start(nextStartTimeRef.current);
     nextStartTimeRef.current += audioBuffer.duration;
+    
+    if (isPlayingRef.current) {
+      activeSourcesRef.current.push(source);
+    }
   };
 
   const togglePlayPause = useCallback(() => {
+    const willPause = isPlayingRef.current;
     isPlayingRef.current = !isPlayingRef.current;
     setIsPlaying(isPlayingRef.current);
+    
+    if (!willPause && gainNodeRef.current) {
+      if (audioContextRef.current?.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+      gainNodeRef.current.gain.setValueAtTime(1, audioContextRef.current!.currentTime);
+    }
+    
+    if (willPause && gainNodeRef.current && audioContextRef.current) {
+      gainNodeRef.current.gain.setValueAtTime(0, audioContextRef.current.currentTime);
+      
+      activeSourcesRef.current.forEach(source => {
+        try {
+          source.stop();
+        } catch (e) {}
+      });
+      activeSourcesRef.current = [];
+      nextStartTimeRef.current = 0;
+    }
   }, []);
 
   // Start streaming function

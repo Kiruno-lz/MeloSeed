@@ -1,9 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { IMusicAnalyzer, IMusicAnalyzerWithCover, MusicAnalysisResult, CompleteMusicMetadata } from './types';
 import { uploadFileToIPFS } from '../ipfs-client';
 
 export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
   private client: GoogleGenerativeAI;
+  private imageClient: GoogleGenAI;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -11,6 +13,7 @@ export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
       throw new Error('GEMINI_API_KEY is not set');
     }
     this.client = new GoogleGenerativeAI(apiKey);
+    this.imageClient = new GoogleGenAI({ apiKey, apiVersion: 'v1' });
   }
 
   async analyze(audioData: ArrayBuffer): Promise<MusicAnalysisResult> {
@@ -93,41 +96,52 @@ Make the description feel human and emotionally resonant - like something you'd 
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'imagen-3.0-generate-002' });
+      const aspectRatios = ['1:1'];
+      const aspectRatio = aspectRatios[0];
       
-      const styleColors = ['#9900ff', '#5200ff', '#ff25f6', '#2af6de', '#ffdd28', '#3dffab', '#d8ff3e', '#d9b2ff'];
-      const randomColor = styleColors[Math.floor(Math.random() * styleColors.length)];
+      const styleColors = [
+        { hex: '#9900ff', name: 'violet' },
+        { hex: '#5200ff', name: 'blue' },
+        { hex: '#ff25f6', name: 'pink' },
+        { hex: '#2af6de', name: 'cyan' },
+        { hex: '#ffdd28', name: 'yellow' },
+        { hex: '#3dffab', name: 'mint' },
+        { hex: '#d8ff3e', name: 'lime' },
+        { hex: '#d9b2ff', name: 'lavender' }
+      ];
+      const selectedStyle = styleColors[Math.floor(Math.random() * styleColors.length)];
 
-      const coverPrompt = `Create an album cover art for music with these characteristics:
-- Title: ${analysis.title}
-- Description: ${analysis.description}
-- Mood: ${analysis.mood}
-- Genre: ${analysis.genre}
-- Tags: ${analysis.tags.join(', ')}
+      const artisticStyles = [
+        'ethereal watercolor with soft gradients',
+        'abstract geometric with flowing lines',
+        'retro synthwave neon aesthetics',
+        'minimalist Bauhaus-inspired design',
+        'surrealist dreamlike composition',
+        'contemporary digital art with texture',
+        'impressionist oil painting style',
+        'futuristic cyberpunk atmosphere'
+      ];
+      const artisticStyle = artisticStyles[Math.floor(Math.random() * artisticStyles.length)];
 
-Create a beautiful, abstract, minimalistic album cover art. Use a color palette centered around ${randomColor}. Style: modern, artistic, high quality digital art, 1024x1024, atmospheric, evocative.`;
+      const coverPrompt = `Album cover art for "${analysis.title}". ${analysis.description}. Mood: ${analysis.mood}, Genre: ${analysis.genre}, Tags: ${analysis.tags.join(', ')}. Create a ${artisticStyle}. Use a color palette centered around ${selectedStyle.name} (#${selectedStyle.hex}). Aspect ratio 1:1, 360x360 pixels. Style: highly artistic, emotionally evocative, modern digital art, professional album cover quality. Make it visually stunning and unique.`;
 
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: coverPrompt }] }],
-        generationConfig: {
-          responseModalities: ['Text', 'Image']
-        }
+      const response = await this.imageClient.models.generateImages({
+        model: 'imagen-4.0-generate-001',
+        prompt: coverPrompt,
+        config: {
+          numberOfImages: 1,
+          outputOptions: {
+            mimeType: 'image/png',
+          },
+        },
       });
       
-      const responseText = result.response.text();
-      
-      const imageMatch = responseText.match(/"base64":\s*"([^"]+)"/);
-      if (imageMatch) {
-        const base64Image = imageMatch[1];
-        const imageBuffer = Buffer.from(base64Image, 'base64');
-        const blob = new Blob([imageBuffer], { type: 'image/png' });
+      for (const generatedImage of response.generatedImages) {
+        const imgBytes = generatedImage.image.imageBytes;
+        const buffer = Buffer.from(imgBytes, 'base64');
+        const blob = new Blob([buffer], { type: 'image/png' });
         const coverUrl = await uploadFileToIPFS(blob);
         return coverUrl;
-      }
-
-      const urlMatch = responseText.match(/"url":\s*"([^"]+)"/);
-      if (urlMatch) {
-        return urlMatch[1];
       }
 
       return '/logo.png';
