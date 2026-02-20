@@ -17,7 +17,7 @@ MeloSeed is a decentralized application (DApp) on the Monad blockchain that gene
 - **Blockchain Interaction**: Wagmi, Viem, RainbowKit.
 - **Smart Contracts**: Solidity (Hardhat framework).
 - **Storage**: Pinata (IPFS).
-- **AI**: Replicate API (Stable Diffusion XL for covers, MusicGen for audio).
+- **AI**: Google AI Studio (Gemini API) for music generation, title/description, and cover image generation.
 
 ## Project Structure
 
@@ -49,7 +49,7 @@ MeloSeed is a decentralized application (DApp) on the Monad blockchain that gene
     ```env
     NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=your_id
     PINATA_JWT=your_pinata_jwt
-    REPLICATE_API_TOKEN=your_replicate_token
+    GOOGLE_API_KEY=your_google_ai_studio_api_key
     PRIVATE_KEY=your_wallet_private_key
     ```
 

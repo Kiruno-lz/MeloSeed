@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GeminiMusicAdapter } from '@/lib/ai/gemini-music-adapter';
-import { compressAudio } from '@/lib/audio-utils';
-import { base64ToArrayBuffer } from '@/lib/utils';
 
 const musicGenerator = new GeminiMusicAdapter();
 
@@ -23,15 +21,11 @@ export async function POST(req: NextRequest) {
       bpm: bpm || 80
     });
 
-    const audioArrayBuffer = base64ToArrayBuffer(generationResult.audioBase64);
-    const compressedBuffer = await compressAudio(audioArrayBuffer);
-    const audioBase64 = Buffer.from(compressedBuffer).toString('base64');
-
     console.log(`Music generation complete for seed: ${seed}`);
 
     return NextResponse.json({
       seed: generationResult.seed,
-      audioBase64,
+      audioBase64: generationResult.audioBase64,
       audioFormat: generationResult.audioFormat,
       styleMix: generationResult.styleMix,
       seedHash: generationResult.seedHash

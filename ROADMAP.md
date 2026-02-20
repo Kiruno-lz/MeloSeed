@@ -9,6 +9,7 @@ The project has reached a stable MVP state on the Monad Devnet. Users can genera
 - **Contract**: `MeloSeed.sol` (ERC1155 + Burnable + Ownable).
 - **Network**: Monad Devnet.
 - **Storage**: IPFS (Pinata).
+- **AI**: Google AI Studio (Gemini API) - Music generation, title/description, cover images.
 
 ## Completed Milestones
 
@@ -35,7 +36,7 @@ The project has reached a stable MVP state on the Monad Devnet. Users can genera
 - [ ] **Likes/Voting**: On-chain or off-chain voting for best melodies.
 
 ### Phase 3: Advanced Generation
-- [ ] **Real AI Music**: Integrate Replicate MusicGen API fully (currently mock/local for stability).
+- [x] **AI Music Generation**: Integrated Google AI Studio (Gemini API) for music generation, title/description, and cover image generation.
 - [ ] **Parameters**: Allow users to tweak generation parameters (BPM, Mood, Instrument).
 
 ### Phase 4: Production Readiness
