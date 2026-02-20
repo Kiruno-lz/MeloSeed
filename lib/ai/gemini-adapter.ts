@@ -10,7 +10,7 @@ export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY is not set');
     }
-    this.client = new GoogleGenerativeAI(apiKey);
+    this.client = new GoogleGenerativeAI(apiKey, { apiVersion: 'v1alpha' });
   }
 
   async analyze(audioData: ArrayBuffer): Promise<MusicAnalysisResult> {
@@ -22,7 +22,7 @@ export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
 
       const base64Audio = this.arrayBufferToBase64(audioData);
       
@@ -232,7 +232,7 @@ Create a beautiful, abstract, minimalistic album cover art with harmonious color
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
 
       const prompt = `Based on this music style mix: ${styleText}
 

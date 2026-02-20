@@ -73,26 +73,29 @@ export class GeminiMusicAdapter implements IMusicGenerator {
     const targetDurationMs = duration * 1000;
     const startTime = Date.now();
 
+    const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!, { apiVersion: 'v1alpha' });
+
     return new Promise((resolve, reject) => {
       let session: any;
 
       const setupSession = async () => {
         try {
-          session = await (this.client as any).live.music.connect({
+          session = await client.live.music.connect({
             model,
             callbacks: {
               onmessage: (message: any) => {
                 if (message.serverContent?.audioChunks) {
                   for (const chunk of message.serverContent.audioChunks) {
                     if (chunk.data) {
-                      audioChunks.push(new Uint8Array(chunk.data));
+                      const decoded = this.decodeBase64(chunk.data);
+                      audioChunks.push(decoded);
                     }
                   }
                 }
                 
                 if (Date.now() - startTime >= targetDurationMs) {
-                  if (session?.disconnect) {
-                    session.disconnect();
+                  if (session?.stop) {
+                    session.stop();
                   }
                 }
               },
@@ -100,7 +103,8 @@ export class GeminiMusicAdapter implements IMusicGenerator {
                 console.error('Lyria session error:', error);
                 reject(error);
               },
-              onclose: () => {
+              onclose: (event: any) => {
+                console.log('Lyria session closed:', event?.reason || 'Completed');
                 if (audioChunks.length > 0) {
                   resolve(this.combineAudioChunks(audioChunks));
                 } else {
@@ -110,26 +114,32 @@ export class GeminiMusicAdapter implements IMusicGenerator {
             },
           });
 
-          await session.setWeightedPrompts(
-            weightedPrompts.length > 0 
+          await session.setWeightedPrompts({
+            weightedPrompts: weightedPrompts.length > 0 
               ? weightedPrompts.map(p => ({ text: p.text, weight: p.weight }))
               : [{ text: prompt, weight: 1.0 }]
-          );
+          });
 
           await session.setMusicGenerationConfig({
-            bpm: bpm || 80,
-            temperature: 0.8,
-            density: 0.6,
-            brightness: 0.5,
+            musicGenerationConfig: {
+              bpm: bpm || 80,
+              temperature: 0.8,
+              density: 0.6,
+              brightness: 0.5,
+            }
           });
 
           await session.play();
 
           setTimeout(async () => {
-            if (session?.disconnect) {
-              session.disconnect();
+            try {
+              if (session?.stop) {
+                await session.stop();
+              }
+            } catch (e) {
+              console.log('Session stop error:', e);
             }
-          }, duration * 1000 + 1000);
+          }, duration * 1000 + 2000);
 
         } catch (error) {
           console.error('Lyria setup error:', error);
@@ -139,6 +149,16 @@ export class GeminiMusicAdapter implements IMusicGenerator {
 
       setupSession();
     });
+  }
+
+  private decodeBase64(base64: string): Uint8Array {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
   }
 
   private combineAudioChunks(chunks: Uint8Array[]): string {
