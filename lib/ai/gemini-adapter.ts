@@ -1,16 +1,16 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/generative-ai';
 import { IMusicAnalyzer, IMusicAnalyzerWithCover, MusicAnalysisResult, CompleteMusicMetadata } from './types';
 import { uploadFileToIPFS } from '../ipfs-client';
 
 export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
-  private client: GoogleGenerativeAI;
+  private client: GoogleGenAI;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY is not set');
     }
-    this.client = new GoogleGenerativeAI(apiKey, { apiVersion: 'v1alpha' });
+    this.client = new GoogleGenAI({ apiKey });
   }
 
   async analyze(audioData: ArrayBuffer): Promise<MusicAnalysisResult> {
@@ -22,8 +22,6 @@ export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
-
       const base64Audio = this.arrayBufferToBase64(audioData);
       
       const prompt = `You are a poetic music curator with an evocative writing style. Analyze this audio and create:
@@ -38,17 +36,18 @@ Respond in JSON format with keys: title, description, tags, mood, genre
 
 Make the description feel human and emotionally resonant - like something you'd write in a personal message to share this music with someone you care about.`;
 
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            data: base64Audio,
-            mimeType: 'audio/mpeg'
-          }
-        },
-        prompt
-      ]);
-
-      const responseText = result.response.text();
+      const result = await this.client.models.generateContent({
+        model: 'gemini-2.5-flash-lite',
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType: 'audio/mpeg', data: base64Audio } },
+            { text: prompt }
+          ]
+        }]
+      });
+      
+      const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -94,8 +93,6 @@ Make the description feel human and emotionally resonant - like something you'd 
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'imagen-3.0-generate-002' });
-
       const styleColors = ['#9900ff', '#5200ff', '#ff25f6', '#2af6de', '#ffdd28', '#3dffab', '#d8ff3e', '#d9b2ff'];
       const randomColor = styleColors[Math.floor(Math.random() * styleColors.length)];
 
@@ -108,22 +105,24 @@ Make the description feel human and emotionally resonant - like something you'd 
 
 Create a beautiful, abstract, minimalistic album cover art. Use a color palette centered around ${randomColor}. Style: modern, artistic, high quality digital art, 1024x1024, atmospheric, evocative.`;
 
-      const result = await model.generateContent(coverPrompt);
-      
-      const responseText = result.response.text();
-      
-      const imageMatch = responseText.match(/"base64":\s*"([^"]+)"/);
-      if (imageMatch) {
-        const base64Image = imageMatch[1];
-        const imageBuffer = Buffer.from(base64Image, 'base64');
-        const blob = new Blob([imageBuffer], { type: 'image/png' });
-        const coverUrl = await uploadFileToIPFS(blob);
-        return coverUrl;
-      }
+      const result = await this.client.models.generateImage({
+        model: 'imagen-3.0-generate-002',
+        prompt: coverPrompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/jpeg',
+          aspectRatio: '1:1'
+        }
+      });
 
-      const urlMatch = responseText.match(/"url":\s*"([^"]+)"/);
-      if (urlMatch) {
-        return urlMatch[1];
+      if (result.generatedImages && result.generatedImages.length > 0) {
+        const image = result.generatedImages[0];
+        if (image.image?.imageBytes) {
+          const imageBuffer = Buffer.from(image.image.imageBytes, 'base64');
+          const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+          const coverUrl = await uploadFileToIPFS(blob);
+          return coverUrl;
+        }
       }
 
       return '/logo.png';
@@ -141,8 +140,6 @@ Create a beautiful, abstract, minimalistic album cover art. Use a color palette 
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'imagen-3.0-generate-002' });
-
       const coverPrompt = `Create an album cover art for a music track with the following characteristics:
 - Title: ${analysis.title}
 - Description: ${analysis.description}
@@ -152,22 +149,24 @@ Create a beautiful, abstract, minimalistic album cover art. Use a color palette 
 
 Create a beautiful, abstract, minimalistic album cover art with harmonious colors that match the mood. Style: modern, artistic, high quality digital art, 1024x1024.`;
 
-      const result = await model.generateContent(coverPrompt);
-      
-      const responseText = result.response.text();
-      
-      const imageMatch = responseText.match(/"base64":\s*"([^"]+)"/);
-      if (imageMatch) {
-        const base64Image = imageMatch[1];
-        const imageBuffer = Buffer.from(base64Image, 'base64');
-        const blob = new Blob([imageBuffer], { type: 'image/png' });
-        const coverUrl = await uploadFileToIPFS(blob);
-        return coverUrl;
-      }
+      const result = await this.client.models.generateImage({
+        model: 'imagen-3.0-generate-002',
+        prompt: coverPrompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/jpeg',
+          aspectRatio: '1:1'
+        }
+      });
 
-      const urlMatch = responseText.match(/"url":\s*"([^"]+)"/);
-      if (urlMatch) {
-        return urlMatch[1];
+      if (result.generatedImages && result.generatedImages.length > 0) {
+        const image = result.generatedImages[0];
+        if (image.image?.imageBytes) {
+          const imageBuffer = Buffer.from(image.image.imageBytes, 'base64');
+          const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+          const coverUrl = await uploadFileToIPFS(blob);
+          return coverUrl;
+        }
       }
 
       return '/logo.png';
@@ -185,18 +184,25 @@ Create a beautiful, abstract, minimalistic album cover art with harmonious color
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'imagen-3.0-generate-002' });
+      const result = await this.client.models.generateImage({
+        model: 'imagen-3.0-generate-002',
+        prompt: prompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/jpeg',
+          aspectRatio: '1:1'
+        }
+      });
 
-      const result = await model.generateContent(prompt);
-      
-      const responseText = result.response.text();
-      
-      const imageMatch = responseText.match(/"base64":\s*"([^"]+)"/);
-      if (imageMatch) {
-        const base64Image = imageMatch[1];
-        const imageBuffer = Buffer.from(base64Image, 'base64');
-        const blob = new Blob([imageBuffer], { type: 'image/png' });
-        const coverUrl = await uploadFileToIPFS(blob);
+      if (result.generatedImages && result.generatedImages.length > 0) {
+        const image = result.generatedImages[0];
+        if (image.image?.imageBytes) {
+          const imageBuffer = Buffer.from(image.image.imageBytes, 'base64');
+          const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+          const coverUrl = await uploadFileToIPFS(blob);
+          return coverUrl;
+        }
+      }
         return coverUrl;
       }
 
@@ -232,8 +238,6 @@ Create a beautiful, abstract, minimalistic album cover art with harmonious color
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
-
       const prompt = `Based on this music style mix: ${styleText}
 
 Create an evocative title and description that captures the artistic essence of this style combination:
@@ -246,8 +250,12 @@ Create an evocative title and description that captures the artistic essence of 
 
 Respond in JSON format with keys: title, description, tags, mood, genre`;
 
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
+      const result = await this.client.models.generateContent({
+        model: 'gemini-2.5-flash-lite',
+        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      });
+      
+      const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {

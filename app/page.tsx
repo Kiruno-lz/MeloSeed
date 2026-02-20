@@ -14,7 +14,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 interface CompleteMusicData {
   seed: number;
-  audioBase64: string;
+  audioBase64?: string;
   title: string;
   description: string;
   tags: string[];
@@ -25,11 +25,10 @@ interface CompleteMusicData {
   seedHash?: string;
 }
 
-interface MusicOnlyData {
+interface MusicReadyData {
   seed: number;
-  audioBase64: string;
+  seedHash: string;
   styleMix?: { name: string; weight: number; color: string }[];
-  seedHash?: string;
 }
 
 export default function Home() {
@@ -38,8 +37,6 @@ export default function Home() {
   
   // Generation State
   const [generatedData, setGeneratedData] = useState<CompleteMusicData | null>(null);
-  const [musicData, setMusicData] = useState<MusicOnlyData | null>(null);
-  const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -62,17 +59,13 @@ export default function Home() {
     }
   }, [generatedData]);
 
-  // Handle music ready - trigger auto-play
-  const handleMusicReady = (data: MusicOnlyData) => {
-    setMusicData(data);
-    setShouldAutoPlay(true);
+  // Handle music ready - streaming started, show player
+  const handleMusicReady = (data: MusicReadyData) => {
+    // Streaming is handled by the hook in Generator, just update state
   };
 
-  // Handle generation complete - update data and trigger auto-play on first call
+  // Handle generation complete - update data
   const handleGenerated = (data: CompleteMusicData) => {
-    if (!generatedData) {
-      setShouldAutoPlay(true);
-    }
     setGeneratedData(data);
   };
 
@@ -89,8 +82,6 @@ export default function Home() {
     if (isSuccess) {
       showToast('NFT Minted Successfully!', 'success');
       setGeneratedData(null);
-      setMusicData(null);
-      setShouldAutoPlay(false);
       setCoverUrl(null);
       setTitle('');
       setDescription('');
@@ -183,10 +174,7 @@ export default function Home() {
                                         styleMix={generatedData.styleMix}
                                         onRestart={() => {
                                           setGeneratedData(null);
-                                          setMusicData(null);
-                                          setShouldAutoPlay(false);
                                         }}
-                                        autoPlay={shouldAutoPlay}
                                         className="sticky top-24"
                                     />
                                 )}
@@ -204,8 +192,6 @@ export default function Home() {
                                     setDescription={setDescription}
                                     onRegenerate={() => {
                                       setGeneratedData(null);
-                                      setMusicData(null);
-                                      setShouldAutoPlay(false);
                                     }}
                                     isAssetsReady={!!coverUrl}
                                 />

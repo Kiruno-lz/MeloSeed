@@ -1,33 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sparkles, Dice5, SlidersHorizontal, Music, FileText, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useStreamingMusic } from '@/lib/hooks/useStreamingMusic';
+
+interface StyleMixItem {
+  name: string;
+  weight: number;
+  color: string;
+}
 
 interface CompleteMusicData {
   seed: number;
-  audioBase64: string;
+  audioBase64?: string;
   title: string;
   description: string;
   tags: string[];
   mood: string;
   genre: string;
   coverUrl: string | null;
+  styleMix?: StyleMixItem[];
+  seedHash?: string;
 }
 
 interface GeneratorProps {
   onGenerated: (data: CompleteMusicData) => void;
-  onMusicReady?: (data: MusicOnlyData) => void;
-}
-
-interface MusicOnlyData {
-  seed: number;
-  audioBase64: string;
-  styleMix?: { name: string; weight: number; color: string }[];
-  seedHash?: string;
+  onMusicReady?: (data: { seed: number; seedHash: string; styleMix: StyleMixItem[] }) => void;
 }
 
 type GenerationStage = 'idle' | 'generating' | 'analyzing' | 'cover' | 'complete';
@@ -39,6 +41,88 @@ export function Generator({ onGenerated, onMusicReady }: GeneratorProps) {
   const [stage, setStage] = useState<GenerationStage>('idle');
   const [error, setError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const { isStreaming, initData, startStream, stopStream } = useStreamingMusic();
+
+  useEffect(() => {
+    if (initData && !loading) {
+      setLoading(true);
+      setStage('generating');
+      onMusicReady?.({
+        seed: initData.seed,
+        seedHash: initData.seedHash,
+        styleMix: initData.styleMix
+      });
+      onGenerated({
+        seed: initData.seed,
+        title: `MeloSeed #${initData.seed}`,
+        description: '',
+        tags: [],
+        mood: 'unknown',
+        genre: 'unknown',
+        coverUrl: null,
+        styleMix: initData.styleMix,
+        seedHash: initData.seedHash
+      });
+
+      if (initData.styleMix && initData.styleMix.length > 0) {
+        setStage('analyzing');
+        Promise.all([
+          fetch('/api/generate-title', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ styleMix: initData.styleMix })
+          }).then(res => res.json()).catch(console.error),
+          
+          fetch('/api/generate-cover-gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: `MeloSeed #${initData.seed}`,
+              description: '',
+              tags: [],
+              mood: 'unknown',
+              genre: 'unknown'
+            })
+          }).then(res => res.json()).catch(console.error)
+        ]).then(([titleData, coverData]) => {
+          const currentData = {
+            seed: initData.seed,
+            title: `MeloSeed #${initData.seed}`,
+            description: '',
+            tags: [],
+            mood: 'unknown',
+            genre: 'unknown',
+            coverUrl: null as string | null,
+            styleMix: initData.styleMix,
+            seedHash: initData.seedHash
+          };
+          const updatedData = {
+            ...currentData,
+            title: titleData?.title || currentData.title,
+            description: titleData?.description || '',
+            tags: titleData?.tags || [],
+            mood: titleData?.mood || 'unknown',
+            genre: titleData?.genre || 'unknown',
+            coverUrl: coverData?.coverUrl || null
+          };
+          setStage('cover');
+          onGenerated(updatedData);
+        }).catch(err => {
+          console.error('Background generation error:', err);
+        });
+      }
+    }
+  }, [initData, loading, onMusicReady, onGenerated]);
+
+  useEffect(() => {
+    if (!isStreaming && loading) {
+      setLoading(false);
+      setStage('complete');
+      setSeed(Math.floor(Math.random() * 1000000));
+      setTimeout(() => setStage('idle'), 2000);
+    }
+  }, [isStreaming, loading]);
 
   const getStageText = () => {
     switch (stage) {
@@ -70,96 +154,24 @@ export function Generator({ onGenerated, onMusicReady }: GeneratorProps) {
     }
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = () => {
     setLoading(true);
     setError('');
     setStage('generating');
     
     try {
-      const res = await fetch('/api/generate-music', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt, 
-          seed,
-          style: 'calm, soothing, gentle, relaxing, soft melody, ambient, peaceful, dreamy',
-          duration: 15,
-          bpm: 80
-        }),
-      });
-
-      if (!res.ok) throw new Error('Music generation failed');
-
-      const musicData = await res.json();
-      
-      const partialData: CompleteMusicData = {
-        seed: Number(musicData.seed),
-        audioBase64: musicData.audioBase64,
-        title: `MeloSeed #${musicData.seed}`,
-        description: '',
-        tags: [],
-        mood: 'unknown',
-        genre: 'unknown',
-        coverUrl: null,
-        styleMix: musicData.styleMix || [],
-        seedHash: musicData.seedHash || ''
-      };
-
-      if (onMusicReady) {
-        onMusicReady({
-          seed: partialData.seed,
-          audioBase64: partialData.audioBase64,
-          styleMix: partialData.styleMix,
-          seedHash: partialData.seedHash
-        });
-      }
-
-      setStage('complete');
-      onGenerated(partialData);
-
-      if (musicData.styleMix && musicData.styleMix.length > 0) {
-        Promise.all([
-          fetch('/api/generate-title', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ styleMix: musicData.styleMix })
-          }).then(res => res.json()).catch(console.error),
-          
-          fetch('/api/generate-cover-gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: partialData.title,
-              description: '',
-              tags: [],
-              mood: 'unknown',
-              genre: 'unknown'
-            })
-          }).then(res => res.json()).catch(console.error)
-        ]).then(([titleData, coverData]) => {
-          const updatedData: CompleteMusicData = {
-            ...partialData,
-            title: titleData?.title || partialData.title,
-            description: titleData?.description || '',
-            tags: titleData?.tags || [],
-            mood: titleData?.mood || 'unknown',
-            genre: titleData?.genre || 'unknown',
-            coverUrl: coverData?.coverUrl || null
-          };
-          onGenerated(updatedData);
-        }).catch(err => {
-          console.error('Background generation error:', err);
-        });
-      }
-      
-      setSeed(Math.floor(Math.random() * 1000000));
+      startStream(
+        prompt,
+        seed,
+        'calm, soothing, gentle, relaxing, soft melody, ambient, peaceful, dreamy',
+        15,
+        80
+      );
     } catch (err) {
-      setError('Failed to generate music. Please try again.');
+      setError('Failed to start streaming. Please try again.');
       console.error(err);
-      setStage('idle');
-    } finally {
       setLoading(false);
-      setTimeout(() => setStage('idle'), 2000);
+      setStage('idle');
     }
   };
 
