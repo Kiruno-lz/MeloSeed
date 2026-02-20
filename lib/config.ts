@@ -26,5 +26,5 @@ export const config = getDefaultConfig({
     [polygon.id]: http(),
     [base.id]: http(),
   },
-  ssr: true,
+  ssr: false,
 });
