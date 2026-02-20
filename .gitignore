@@ -44,4 +44,8 @@ Thumbs.db
 tmp/
 temp/
 
-scripts/setup-gh-secrets.sh
+ai-models/ckpt/**
+
+scripts/**
+
+.trae
