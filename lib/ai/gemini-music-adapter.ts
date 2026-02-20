@@ -1,11 +1,11 @@
 import { IMusicGenerator, MusicGenerationOptions, MusicGenerationResult } from './types';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import fs from 'fs/promises';
 import path from 'path';
 import { SeedToStyleMapper, DEFAULT_STYLES, seedToHash } from '@/lib/seed-mapper';
 
 export class GeminiMusicAdapter implements IMusicGenerator {
-  private client: GoogleGenerativeAI;
+  private client: GoogleGenAI;
   private defaultStyle = 'calm, soothing, gentle, relaxing, soft melody, ambient';
 
   constructor() {
@@ -13,7 +13,7 @@ export class GeminiMusicAdapter implements IMusicGenerator {
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY is not set');
     }
-    this.client = new GoogleGenerativeAI(apiKey);
+    this.client = new GoogleGenAI({ apiKey, apiVersion: 'v1alpha' });
   }
 
   async generate(options: MusicGenerationOptions): Promise<MusicGenerationResult> {
@@ -73,14 +73,12 @@ export class GeminiMusicAdapter implements IMusicGenerator {
     const targetDurationMs = duration * 1000;
     const startTime = Date.now();
 
-    const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!, { apiVersion: 'v1alpha' });
-
     return new Promise((resolve, reject) => {
       let session: any;
 
       const setupSession = async () => {
         try {
-          session = await client.live.music.connect({
+          session = await this.client.live.music.connect({
             model,
             callbacks: {
               onmessage: (message: any) => {
