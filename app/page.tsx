@@ -37,9 +37,11 @@ export default function Home() {
   
   // Streaming State - moved to parent to persist across component changes
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [streamInitData, setStreamInitData] = useState<MusicReadyData | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef<number>(0);
+  const isPlayingRef = useRef(false);
   
   // Generation State
   const [generatedData, setGeneratedData] = useState<CompleteMusicData | null>(null);
@@ -85,6 +87,8 @@ export default function Home() {
   };
 
   const playChunk = (base64Audio: string) => {
+    if (!isPlayingRef.current) return;
+    
     const ctx = initAudioContext();
     const floatData = decodeAudioChunk(base64Audio);
     
@@ -115,10 +119,17 @@ export default function Home() {
     nextStartTimeRef.current += audioBuffer.duration;
   };
 
+  const togglePlayPause = useCallback(() => {
+    isPlayingRef.current = !isPlayingRef.current;
+    setIsPlaying(isPlayingRef.current);
+  }, []);
+
   // Start streaming function
   const startStreaming = async (prompt: string, seed: number, style: string, duration: number, bpm: number) => {
     console.log('startStreaming called with seed:', seed);
     setIsStreaming(true);
+    setIsPlaying(true);
+    isPlayingRef.current = true;
     nextStartTimeRef.current = 0;
 
     try {
@@ -270,6 +281,8 @@ export default function Home() {
     setCoverUrl(null);
     setTitle('');
     setDescription('');
+    setIsPlaying(false);
+    isPlayingRef.current = false;
   };
 
   // Effect: Set metadata when new music is generated
@@ -383,6 +396,9 @@ export default function Home() {
                                         styleMix={generatedData.styleMix}
                                         onRestart={handleRestart}
                                         className="sticky top-24"
+                                        isStreaming={isStreaming}
+                                        isPlaying={isPlaying}
+                                        onPlayPause={togglePlayPause}
                                     />
                                 )}
                             </div>

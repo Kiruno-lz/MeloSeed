@@ -120,16 +120,6 @@ export class GeminiMusicAdapter implements IMusicGenerator {
 
           session.play();
 
-          setTimeout(async () => {
-            try {
-              if (session?.stop) {
-                await session.stop();
-              }
-            } catch (e) {
-              console.log('Session stop error:', e);
-            }
-          }, duration * 1000 + 2000);
-
         } catch (error) {
           console.error('Lyria setup error:', error);
           reject(error);

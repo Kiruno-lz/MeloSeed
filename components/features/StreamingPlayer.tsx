@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RefreshCw, Hash, Sparkles, Radio } from 'lucide-react';
+import { Play, Pause, Hash, Sparkles, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,9 @@ interface StreamingPlayerProps {
   onRestart?: () => void;
   className?: string;
   autoPlay?: boolean;
+  isStreaming?: boolean;
+  isPlaying?: boolean;
+  onPlayPause?: () => void;
 }
 
 export function StreamingPlayer({
@@ -34,13 +37,19 @@ export function StreamingPlayer({
   styleMix = [],
   onRestart,
   className,
-  autoPlay = false
+  autoPlay = false,
+  isStreaming = false,
+  isPlaying: externalIsPlaying,
+  onPlayPause
 }: StreamingPlayerProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [internalIsPlaying, setInternalIsPlaying] = useState(false);
+  const isPlaying = externalIsPlaying !== undefined ? externalIsPlaying : internalIsPlaying;
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamStartTimeRef = useRef<number>(0);
+  const streamElapsedRef = useRef<number>(0);
 
   const audioSrc = audioBase64 ? `data:audio/mp3;base64,${audioBase64}` : null;
 
@@ -73,6 +82,23 @@ export function StreamingPlayer({
       audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, []);
+
+  useEffect(() => {
+    if (isStreaming && isPlaying) {
+      if (streamStartTimeRef.current === 0) {
+        streamStartTimeRef.current = Date.now() - (streamElapsedRef.current * 1000);
+      }
+      
+      const interval = setInterval(() => {
+        streamElapsedRef.current = (Date.now() - streamStartTimeRef.current) / 1000;
+        setCurrentTime(streamElapsedRef.current);
+      }, 100);
+      
+      return () => clearInterval(interval);
+    } else if (!isPlaying) {
+      streamStartTimeRef.current = 0;
+    }
+  }, [isStreaming, isPlaying]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -132,14 +158,16 @@ export function StreamingPlayer({
   }, [isPlaying, currentTime, styleMix]);
 
   const togglePlay = useCallback(() => {
-    if (!audioRef.current) return;
-    
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
+    if (onPlayPause) {
+      onPlayPause();
+    } else if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
     }
-  }, [isPlaying]);
+  }, [isPlaying, onPlayPause]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -253,24 +281,16 @@ export function StreamingPlayer({
                 {isPlaying ? (
                   <div className="flex items-center gap-2">
                     <Pause className="w-5 h-5" />
-                    <span>Pause Stream</span>
+                    <span>Pause</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
                     <Play className="w-5 h-5" />
-                    <span>Start Stream</span>
+                    <span>Resume</span>
                   </div>
                 )}
               </Button>
-              
-              {onRestart && (
-                <Button 
-                  variant="outline"
-                  size="icon"
-                  onClick={onRestart}
-                  className="h-12 w-12 rounded-xl border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
-                >
-                  <RefreshCw className="w-4 h-4" />
+            </div>
                 </Button>
               )}
             </div>

@@ -104,16 +104,6 @@ export async function POST(req: NextRequest) {
 
           session.play();
 
-          setTimeout(async () => {
-            try {
-              if (session?.stop && !closed) {
-                await session.stop();
-              }
-            } catch (e) {
-              console.log('Session stop error:', e);
-            }
-          }, targetDuration * 1000 + 2000);
-
         } catch (error) {
           console.error('Lyria streaming error:', error);
           if (!closed) {
