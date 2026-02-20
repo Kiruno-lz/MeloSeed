@@ -86,6 +86,53 @@ Make the description feel human and emotionally resonant - like something you'd 
     };
   }
 
+  async generateCoverFromStyleMix(analysis: MusicAnalysisResult): Promise<string> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      return '/logo.png';
+    }
+
+    try {
+      const model = this.client.getGenerativeModel({ model: 'gemini-2.0-flash-exp-image-generation' });
+
+      const styleColors = ['#9900ff', '#5200ff', '#ff25f6', '#2af6de', '#ffdd28', '#3dffab', '#d8ff3e', '#d9b2ff'];
+      const randomColor = styleColors[Math.floor(Math.random() * styleColors.length)];
+
+      const coverPrompt = `Create an album cover art for music with these characteristics:
+- Title: ${analysis.title}
+- Description: ${analysis.description}
+- Mood: ${analysis.mood}
+- Genre: ${analysis.genre}
+- Tags: ${analysis.tags.join(', ')}
+
+Create a beautiful, abstract, minimalistic album cover art. Use a color palette centered around ${randomColor}. Style: modern, artistic, high quality digital art, 1024x1024, atmospheric, evocative.`;
+
+      const result = await model.generateContent(coverPrompt);
+      
+      const responseText = result.response.text();
+      
+      const imageMatch = responseText.match(/"base64":\s*"([^"]+)"/);
+      if (imageMatch) {
+        const base64Image = imageMatch[1];
+        const imageBuffer = Buffer.from(base64Image, 'base64');
+        const blob = new Blob([imageBuffer], { type: 'image/png' });
+        const coverUrl = await uploadFileToIPFS(blob);
+        return coverUrl;
+      }
+
+      const urlMatch = responseText.match(/"url":\s*"([^"]+)"/);
+      if (urlMatch) {
+        return urlMatch[1];
+      }
+
+      return '/logo.png';
+    } catch (error) {
+      console.error('Cover generation error:', error);
+      return '/logo.png';
+    }
+  }
+
   private async generateCover(analysis: MusicAnalysisResult): Promise<string> {
     const apiKey = process.env.GEMINI_API_KEY;
     
@@ -174,7 +221,75 @@ Create a beautiful, abstract, minimalistic album cover art with harmonious color
     return btoa(binary);
   }
 
-  private getMockAnalysis(): MusicAnalysisResult {
+  async generateTitleFromStyleMix(styleMix: { name: string; weight: number; color: string }[]): Promise<MusicAnalysisResult> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    const styleText = styleMix.map(s => `${s.name} (${Math.round(s.weight * 100)}%)`).join(', ');
+    
+    if (!apiKey) {
+      console.warn('No GEMINI_API_KEY found, returning mock title from style mix.');
+      return this.getMockAnalysisFromStyle(styleText);
+    }
+
+    try {
+      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `Based on this music style mix: ${styleText}
+
+Create an evocative title and description that captures the artistic essence of this style combination:
+
+1. TITLE: A poetic, captivating title (max 8 words) that reflects the artistic vibe of these styles
+2. DESCRIPTION: Write an atmospheric, poetic description (2-3 sentences) that paints a picture of the artistic journey this style mix represents. Make it feel like an intimate note to someone special - evocative, sensory, and emotionally resonant. Avoid generic AI phrases.
+3. TAGS: 5 relevant tags (comma separated)
+4. MOOD: The emotional atmosphere
+5. GENRE: The dominant music style
+
+Respond in JSON format with keys: title, description, tags, mood, genre`;
+
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+      
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          title: parsed.title || 'Untitled',
+          description: parsed.description || '',
+          tags: Array.isArray(parsed.tags) ? parsed.tags : parsed.tags.split(',').map((t: string) => t.trim()),
+          mood: parsed.mood || 'unknown',
+          genre: parsed.genre || 'unknown'
+        };
+      }
+
+      return this.getMockAnalysisFromStyle(styleText);
+    } catch (error) {
+      console.error('Gemini Title Generation Error:', error);
+      return this.getMockAnalysisFromStyle(styleText);
+    }
+  }
+
+  private getMockAnalysisFromStyle(styleText: string): MusicAnalysisResult {
+    const titles = [
+      'Midnight Frequencies', 'Neon Dreams', 'Cosmic Drift', 'Digital Serenity',
+      'Velvet Echoes', 'Starlight Protocol', 'Urban Solitude', 'Crystal Waves',
+      'Silent Rebellion', 'Ethereal Journey'
+    ];
+    const descriptions = [
+      'Like wandering through a neon-lit city at 3am, where every reflection tells a story - this is a moment of pure introspection set to sound.',
+      'Whispers of a distant future where technology and emotion intertwine, creating a sanctuary of sound for the thoughtful soul.',
+      'A gentle exploration of inner landscapes, where rhythm meets reflection and every beat echoes the heartbeat of the universe.'
+    ];
+    
+    const seed = styleText.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    
+    return {
+      title: titles[seed % titles.length],
+      description: descriptions[seed % descriptions.length],
+      tags: ['electronic', 'ambient', 'atmospheric', 'cinematic', 'evocative'],
+      mood: 'dreamy',
+      genre: 'ambient'
+    };
+  }
     return {
       title: 'Starlight Lullaby',
       description: 'Like drifting through a quiet midnight sky, this gentle melody wraps you in warmth and nostalgia - a tender moment of peace between friends, where silence speaks louder than words.',

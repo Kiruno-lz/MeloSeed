@@ -25,29 +25,32 @@ export async function POST(req: NextRequest) {
       bpm: bpm || 80
     });
 
+    const styleMix = generationResult.styleMix || [];
+    const styleMetadata = await musicAnalyzer.generateTitleFromStyleMix(styleMix);
+
     const audioArrayBuffer = base64ToArrayBuffer(generationResult.audioBase64);
     const compressedBuffer = await compressAudio(audioArrayBuffer);
     const audioBase64 = Buffer.from(compressedBuffer).toString('base64');
 
-    console.log(`Analyzing music and generating cover for seed: ${seed}`);
+    console.log(`Generating cover for seed: ${seed}`);
     
-    const metadata = await musicAnalyzer.analyzeAndGenerateCover(compressedBuffer.buffer as ArrayBuffer);
+    const coverUrl = await musicAnalyzer.generateCoverFromStyleMix(styleMetadata);
 
     console.log(`Generation complete for seed: ${seed}`, {
-      title: metadata.title,
-      coverUrl: metadata.coverUrl
+      title: styleMetadata.title,
+      coverUrl: coverUrl
     });
 
     return NextResponse.json({
       seed: generationResult.seed,
       audioBase64,
       audioFormat: generationResult.audioFormat,
-      title: metadata.title,
-      description: metadata.description,
-      tags: metadata.tags,
-      mood: metadata.mood,
-      genre: metadata.genre,
-      coverUrl: metadata.coverUrl,
+      title: styleMetadata.title,
+      description: styleMetadata.description,
+      tags: styleMetadata.tags,
+      mood: styleMetadata.mood,
+      genre: styleMetadata.genre,
+      coverUrl: coverUrl,
       styleMix: generationResult.styleMix,
       seedHash: generationResult.seedHash
     });

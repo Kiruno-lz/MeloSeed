@@ -36,10 +36,13 @@ export class GeminiMusicAdapter implements IMusicGenerator {
       const styleTexts = weightedPrompts.map(p => `${p.text} (${Math.round(p.weight * 100)}%)`).join(', ');
       const fullPrompt = `${styleTexts}${prompt ? `, ${prompt}` : ''}`.trim();
       
-      console.log(`Seed ${seed} -> Hash: ${seedToHash(seed)}`);
-      console.log('Style Mix:', weightedPrompts.map(p => `${p.text}:${Math.round(p.weight*100)}%`).join(' | '));
+      console.log(`🌱 Seed ${seed} -> Hash: ${seedToHash(seed)}`);
+      console.log('🎵 Style Mix:', weightedPrompts.map(p => `${p.text}:${Math.round(p.weight*100)}%`).join(' | '));
+      console.log('🔊 Starting Lyria RealTime generation...');
 
       const audioBase64 = await this.generateWithLyria(fullPrompt, options.bpm, duration, weightedPrompts);
+
+      console.log('✅ Lyria RealTime generation completed successfully');
 
       return {
         audioBase64,
@@ -53,7 +56,8 @@ export class GeminiMusicAdapter implements IMusicGenerator {
         seedHash: seedToHash(seed)
       };
     } catch (error) {
-      console.error('Gemini Music Generation Error:', error);
+      console.error('❌ Lyria Music Generation Error:', error);
+      console.warn('Falling back to mock audio');
       return this.getMockAudio(options.seed);
     }
   }

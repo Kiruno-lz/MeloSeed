@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RefreshCw, Disc, Activity, Hash, Sparkles, Volume2 } from 'lucide-react';
+import { Play, Pause, RefreshCw, Hash, Sparkles, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +35,6 @@ export function StreamingPlayer({
   className
 }: StreamingPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioLevel, setAudioLevel] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -71,42 +70,45 @@ export function StreamingPlayer({
   }, []);
 
   useEffect(() => {
-    if (!isPlaying || !canvasRef.current) return;
+    if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const bars = 64;
-    const barWidth = canvas.width / bars;
+    const width = canvas.width;
+    const height = canvas.height;
+    const bars = 48;
+    const barWidth = width / bars;
+
+    const colors = styleMix.length > 0 
+      ? styleMix.map(s => s.color)
+      : ['#8b5cf6', '#a855f7', '#c084fc'];
 
     const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, width, height);
 
       for (let i = 0; i < bars; i++) {
-        const height = isPlaying 
-          ? Math.random() * (canvas.height * 0.8) + canvas.height * 0.1
-          : canvas.height * 0.05;
+        const phase = (i / bars) * Math.PI * 2;
+        const wave = Math.sin(phase + currentTime * 0.5);
+        const amplitude = isPlaying ? 0.7 : 0.1;
+        const heightRatio = (wave * 0.5 + 0.5) * amplitude;
+        const barHeight = Math.max(4, height * heightRatio);
         
-        const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - height);
+        const colorIndex = Math.floor((i / bars) * colors.length);
+        const color = colors[colorIndex];
         
-        if (styleMix.length > 0) {
-          const colorIndex = Math.floor((i / bars) * styleMix.length);
-          const color = styleMix[colorIndex]?.color || '#8b5cf6';
-          gradient.addColorStop(0, color);
-          gradient.addColorStop(1, `${color}66`);
-        } else {
-          gradient.addColorStop(0, '#8b5cf6');
-          gradient.addColorStop(1, '#a855f766');
-        }
+        const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(1, color + '88');
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.roundRect(
           i * barWidth + 1,
-          canvas.height - height,
+          height - barHeight,
           barWidth - 2,
-          height,
+          barHeight,
           2
         );
         ctx.fill();
@@ -122,7 +124,7 @@ export function StreamingPlayer({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPlaying, styleMix]);
+  }, [isPlaying, currentTime, styleMix]);
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current) return;
@@ -141,129 +143,132 @@ export function StreamingPlayer({
   };
 
   return (
-    <div className={cn("w-full max-w-md mx-auto", className)}>
-      <div className="relative group">
-        <div className="absolute -inset-2 bg-gradient-to-r from-violet-500/20 via-purple-500/20 to-fuchsia-500/20 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-700" />
+    <div className={cn("w-full max-w-sm mx-auto", className)}>
+      <div className="relative">
+        <div className="absolute -inset-4 bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-fuchsia-500/10 opacity-0 group-hover:opacity-100 blur-2xl transition-all duration-700" />
         
-        <div className="relative bg-gradient-to-b from-secondary/80 to-background rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
-          <div className="relative aspect-square">
+        <div className="relative bg-gradient-to-b from-zinc-900 to-black rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
+          <div className="relative aspect-square overflow-hidden">
             {coverUrl ? (
               <img 
                 src={coverUrl} 
                 alt={title}
-                className="w-full h-full object-cover transition-all duration-700"
+                className="w-full h-full object-cover transition-transform duration-[2s]"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/50 to-purple-900/50">
-                <div className="relative">
-                  <Disc className={cn(
-                    "w-24 h-24 text-violet-400/50",
-                    isPlaying && "animate-spin"
-                  )} style={{ animationDuration: '3s' }} />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-8 h-8 rounded-full bg-violet-500/30 backdrop-blur-sm" />
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/40 via-purple-900/30 to-zinc-900">
+                <div className={cn(
+                  "relative w-40 h-40 transition-transform duration-500",
+                  isPlaying && "animate-[spin_8s_linear_infinite]"
+                )}>
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-violet-600 to-purple-900 shadow-2xl" />
+                  <div className="absolute inset-4 rounded-full bg-zinc-900 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500" />
+                  </div>
+                  <div className="absolute inset-0 rounded-full border-2 border-white/10" style={{ padding: '8px' }}>
+                    <div className="w-full h-full rounded-full border border-white/5 border-dashed" />
                   </div>
                 </div>
               </div>
             )}
 
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-
-            <div className="absolute inset-0 flex items-center justify-center">
-              <button
-                onClick={togglePlay}
-                className={cn(
-                  "w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300",
-                  isPlaying 
-                    ? "bg-white/10 backdrop-blur-md border border-white/20 scale-100"
-                    : "bg-violet-500 hover:bg-violet-400 scale-110 shadow-lg shadow-violet-500/40"
-                )}
-              >
-                {isPlaying ? (
-                  <Pause className="w-8 h-8 text-white" />
-                ) : (
-                  <Play className="w-8 h-8 text-white ml-1" />
-                )}
-              </button>
-            </div>
           </div>
 
-          <div className="p-6 space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-white truncate">{title}</h2>
-                {description && (
-                  <p className="text-sm text-white/60 line-clamp-2 mt-1">{description}</p>
-                )}
+          <div className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10">
+                <Radio className="w-3 h-3 text-violet-400 animate-pulse" />
+                <span className="text-xs font-medium text-violet-300">LIVE</span>
               </div>
               
               {seed !== undefined && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10 ml-3">
-                  <Hash className="w-3 h-3 text-violet-400" />
-                  <span className="text-xs font-mono text-violet-300">{seed}</span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-800/80 rounded-full border border-white/10">
+                  <Hash className="w-3 h-3 text-zinc-400" />
+                  <span className="text-xs font-mono text-zinc-300">{seed}</span>
                 </div>
               )}
             </div>
 
-            <div className="h-16 w-full rounded-xl overflow-hidden bg-black/20 border border-white/5">
-              <canvas 
-                ref={canvasRef}
-                width={400}
-                height={64}
-                className="w-full h-full"
-              />
+            <div>
+              <h2 className="text-lg font-bold text-white truncate leading-tight">{title}</h2>
+              {seedHash && (
+                <code className="text-xs font-mono text-violet-400/60 mt-1 block truncate">
+                  {seedHash}
+                </code>
+              )}
             </div>
 
-            <div className="flex items-center justify-between text-xs text-white/40">
-              <div className="flex items-center gap-2">
-                <Activity className="w-3 h-3" />
-                <span>LIVE STREAM</span>
+            <div className="h-12 w-full rounded-lg overflow-hidden bg-zinc-900/50 border border-white/5 relative">
+              <canvas 
+                ref={canvasRef}
+                width={320}
+                height={48}
+                className="w-full h-full"
+              />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-xs text-white/20 font-mono">{formatTime(currentTime)}</span>
               </div>
-              <span className="font-mono">{formatTime(currentTime)}</span>
             </div>
 
             {styleMix.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {styleMix.slice(0, 4).map((style, idx) => (
+              <div className="flex flex-wrap gap-1.5">
+                {styleMix.slice(0, 3).map((style, idx) => (
                   <div 
                     key={idx}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium"
                     style={{ 
-                      backgroundColor: `${style.color}20`,
+                      backgroundColor: style.color + '15',
                       color: style.color,
-                      border: `1px solid ${style.color}40`
+                      border: `1px solid ${style.color}30`
                     }}
                   >
-                    <Sparkles className="w-3 h-3" />
+                    <Sparkles className="w-2.5 h-2.5" />
                     <span>{style.name}</span>
-                    <span className="opacity-60">{Math.round(style.weight * 100)}%</span>
                   </div>
                 ))}
+                {styleMix.length > 3 && (
+                  <span className="text-[10px] text-zinc-500 self-center">
+                    +{styleMix.length - 3}
+                  </span>
+                )}
               </div>
             )}
 
-            {seedHash && (
-              <div className="pt-2 border-t border-white/5">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-white/40">Signature:</span>
-                  <code className="text-xs font-mono text-violet-400/80 bg-violet-500/10 px-2 py-0.5 rounded">
-                    {seedHash}
-                  </code>
-                </div>
-              </div>
-            )}
-
-            {onRestart && (
+            <div className="flex gap-3 pt-1">
               <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onRestart}
-                className="w-full border-white/10 text-white/60 hover:text-white hover:bg-white/5"
+                onClick={togglePlay}
+                className={cn(
+                  "flex-1 h-12 rounded-xl font-semibold transition-all duration-300",
+                  isPlaying 
+                    ? "bg-zinc-800 hover:bg-zinc-700 text-white border border-white/10"
+                    : "bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg shadow-violet-500/25"
+                )}
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Regenerate with New Seed
+                {isPlaying ? (
+                  <div className="flex items-center gap-2">
+                    <Pause className="w-5 h-5" />
+                    <span>Pause Stream</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Play className="w-5 h-5" />
+                    <span>Start Stream</span>
+                  </div>
+                )}
               </Button>
-            )}
+              
+              {onRestart && (
+                <Button 
+                  variant="outline"
+                  size="icon"
+                  onClick={onRestart}
+                  className="h-12 w-12 rounded-xl border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
