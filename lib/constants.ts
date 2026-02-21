@@ -1,4 +1,4 @@
-export const CONTRACT_ADDRESS = '0xNEW_CONTRACT_ADDRESS_HERE';
+export const CONTRACT_ADDRESS = '0xe9c4Bd588f163855fD5242bFd2dA7612d62fC51C';
 
 export const MELO_SEED_ABI = [
   {
