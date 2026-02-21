@@ -67,6 +67,7 @@ export default function Home() {
     if (!audioContextRef.current) {
       audioContextRef.current = new AudioContext({ sampleRate: 48000 });
       gainNodeRef.current = audioContextRef.current.createGain();
+      gainNodeRef.current.gain.setValueAtTime(isPlayingRef.current ? 1 : 0, audioContextRef.current.currentTime);
       gainNodeRef.current.connect(audioContextRef.current.destination);
     }
     if (audioContextRef.current.state === 'suspended') {
@@ -144,19 +145,23 @@ export default function Home() {
     isPlayingRef.current = !isPlayingRef.current;
     setIsPlaying(isPlayingRef.current);
     
-    if (!willPause && audioContextRef.current && gainNodeRef.current) {
-      if (audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume();
+    if (!willPause) {
+      const ctx = initAudioContext();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
       }
-      gainNodeRef.current.gain.cancelScheduledValues(audioContextRef.current.currentTime);
-      gainNodeRef.current.gain.setValueAtTime(0, audioContextRef.current.currentTime);
-      gainNodeRef.current.gain.linearRampToValueAtTime(1, audioContextRef.current.currentTime + 0.1);
+      if (gainNodeRef.current) {
+        gainNodeRef.current.gain.cancelScheduledValues(ctx.currentTime);
+        gainNodeRef.current.gain.setValueAtTime(0, ctx.currentTime);
+        gainNodeRef.current.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.1);
+      }
     }
     
     if (willPause && audioContextRef.current && gainNodeRef.current) {
-      gainNodeRef.current.gain.cancelScheduledValues(audioContextRef.current.currentTime);
-      gainNodeRef.current.gain.setValueAtTime(1, audioContextRef.current.currentTime);
-      gainNodeRef.current.gain.linearRampToValueAtTime(0, audioContextRef.current.currentTime + 0.05);
+      const ctx = audioContextRef.current;
+      gainNodeRef.current.gain.cancelScheduledValues(ctx.currentTime);
+      gainNodeRef.current.gain.setValueAtTime(1, ctx.currentTime);
+      gainNodeRef.current.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.05);
       
       activeSourcesRef.current.forEach(source => {
         try {
@@ -167,19 +172,37 @@ export default function Home() {
       nextStartTimeRef.current = 0;
       
       gainNodeRef.current.disconnect();
-      gainNodeRef.current = audioContextRef.current.createGain();
-      gainNodeRef.current.gain.setValueAtTime(0, audioContextRef.current.currentTime);
-      gainNodeRef.current.connect(audioContextRef.current.destination);
+      gainNodeRef.current = ctx.createGain();
+      gainNodeRef.current.gain.setValueAtTime(0, ctx.currentTime);
+      gainNodeRef.current.connect(ctx.destination);
     }
   }, []);
 
   // Start streaming function
   const startStreaming = async (prompt: string, seed: number, style: string, duration: number, bpm: number) => {
     console.log('startStreaming called with seed:', seed);
+    
+    // Clear all previous audio state before starting new stream
+    if (audioContextRef.current) {
+      activeSourcesRef.current.forEach(source => {
+        try {
+          source.stop();
+        } catch (e) {}
+      });
+      activeSourcesRef.current = [];
+      
+      if (gainNodeRef.current) {
+        gainNodeRef.current.disconnect();
+      }
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+      gainNodeRef.current = null;
+    }
+    
+    nextStartTimeRef.current = 0;
     setIsStreaming(true);
     setIsPlaying(true);
     isPlayingRef.current = true;
-    nextStartTimeRef.current = 0;
 
     try {
       console.log('Fetching stream...');
@@ -363,17 +386,9 @@ export default function Home() {
       // User navigated away from create view - stop all audio
       stopAllAudio();
       setIsStreaming(false);
-    } else if (view === 'create' && !generatedData) {
-      // User returned to create view with no generated data - reset everything
-      stopAllAudio();
-      setIsStreaming(false);
-      setGeneratedData(null);
-      setStreamInitData(null);
-      setCoverUrl(null);
-      setTitle('');
-      setDescription('');
+      // Don't clear generatedData - preserve it so user can return
     }
-  }, [view, isStreaming, generatedData, stopAllAudio]);
+  }, [view, isStreaming, stopAllAudio]);
 
   // Effect: Set metadata when new music is generated
   useEffect(() => {
