@@ -46,6 +46,7 @@ export default function Home() {
   const isPlayingRef = useRef(false);
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Generation State
   const [generatedData, setGeneratedData] = useState<CompleteMusicData | null>(null);
@@ -182,6 +183,11 @@ export default function Home() {
   const startStreaming = async (prompt: string, seed: number, style: string, duration: number, bpm: number) => {
     console.log('startStreaming called with seed:', seed);
     
+    // Abort any previous stream request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
     // Clear all previous audio state before starting new stream
     if (audioContextRef.current) {
       activeSourcesRef.current.forEach(source => {
@@ -199,6 +205,10 @@ export default function Home() {
       gainNodeRef.current = null;
     }
     
+    // Create new AbortController for this stream
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
     nextStartTimeRef.current = 0;
     setIsStreaming(true);
     setIsPlaying(true);
@@ -209,7 +219,8 @@ export default function Home() {
       const response = await fetch('/api/generate-music/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, seed, style, duration, bpm })
+        body: JSON.stringify({ prompt, seed, style, duration, bpm }),
+        signal: abortController.signal
       });
 
       console.log('Response status:', response.status, response.statusText);
@@ -337,8 +348,14 @@ export default function Home() {
       
       setIsStreaming(false);
     } catch (err) {
-      console.error('Stream error:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Stream aborted');
+      } else {
+        console.error('Stream error:', err);
+      }
       setIsStreaming(false);
+    } finally {
+      abortControllerRef.current = null;
     }
   };
 
@@ -354,6 +371,12 @@ export default function Home() {
   };
 
   const stopAllAudio = useCallback(() => {
+    // Abort any ongoing stream request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
     isPlayingRef.current = false;
     setIsPlaying(false);
     
@@ -380,15 +403,43 @@ export default function Home() {
     }
   }, []);
 
-  // Effect: Handle view changes - stop audio when leaving streaming view
+  // Effect: Handle view changes - stop audio and reset when leaving create view
   useEffect(() => {
-    if (view !== 'create' && isStreaming) {
-      // User navigated away from create view - stop all audio
+    if (view !== 'create') {
+      // User navigated away from create view - stop all audio and reset
       stopAllAudio();
       setIsStreaming(false);
-      // Don't clear generatedData - preserve it so user can return
+      // Clear generated data to return to initial state
+      setGeneratedData(null);
+      setStreamInitData(null);
+      setCoverUrl(null);
+      setTitle('');
+      setDescription('');
     }
-  }, [view, isStreaming, stopAllAudio]);
+  }, [view, stopAllAudio]);
+
+  // Effect: Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      // Abort stream request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      // Stop all audio
+      activeSourcesRef.current.forEach(source => {
+        try {
+          source.stop();
+        } catch (e) {}
+      });
+      // Close audio context
+      if (audioContextRef.current) {
+        if (gainNodeRef.current) {
+          gainNodeRef.current.disconnect();
+        }
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
 
   // Effect: Set metadata when new music is generated
   useEffect(() => {
