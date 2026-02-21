@@ -1,99 +1,235 @@
-# Project Roadmap - Branch Refactoring
+# MeloSeed Roadmap
 
-## Current Status
-
-This branch focuses on refactoring the smart contract and frontend to eliminate IPFS overhead:
-- **Images**: Will use SiliconFlow direct URLs instead of IPFS
-- **Music**: Will use seed-based streaming generation instead of stored MP3 files
-- **Storage**: Only seed and image URL will be stored on-chain
+> *种下一颗记录你的心的旋律*
 
 ---
 
-## Tasks
+## Vision
 
-### Phase 1: Smart Contract Refactoring
+在音乐"注意力危机"的时代，88%的歌曲无人问津。MeloSeed 相信，真正珍贵的音乐是那些能够诠释你人生故事、触发你回忆与激情、记录你某一刻感动的旋律。
 
-- [ ] **1.1** Update `MeloSeed.sol` to store seed and imageUrl directly:
-  - Add `seeds` mapping (uint256 => uint256) for music generation seed
-  - Add `imageUrls` mapping (uint256 => string) for SiliconFlow image URL
-  - Add `titles` mapping (uint256 => string) for music title
-  - Add `setTokenData` function to set seed, imageUrl, and title during mint
-  - Update `uri()` to return on-chain data format or IPFS fallback
-
-- [ ] **1.2** Deploy new contract to Monad Devnet
-
-- [ ] **1.3** Update `CONTRACT_ADDRESS` in `lib/constants.ts`
-
-- [ ] **1.4** Update `MELO_SEED_ABI` in `lib/constants.ts` with new functions
+我们不是在生成音乐，而是在种下永恒的情感种子。
 
 ---
 
-### Phase 2: Minting Flow Updates
+## Milestones
 
-- [ ] **2.1** Modify `handleMint` in `app/page.tsx`:
-  - Use SiliconFlow image URL directly (remove IPFS upload)
-  - Call new contract function to store seed + imageUrl + title
-  - Remove metadata JSON upload to IPFS
+### v1.0 Foundation (Completed)
 
----
+**从链上项目到 AI-Base 区块链应用**
 
-### Phase 3: NFTPlayer Refactoring (Collection View)
-
-- [ ] **3.1** Refactor `NFTPlayer.tsx` to support seed-based streaming:
-  - Fetch seed and imageUrl from contract instead of IPFS metadata
-  - Integrate `useStreamingMusic` hook for playback
-  - Display styleMix derived from seed using `SeedToStyleMapper`
-
-- [ ] **3.2** Implement stream interruption:
-  - Add AbortController to abort previous stream when switching NFTs
-  - Ensure `stopStream()` is called before starting new NFT playback
-
-- [ ] **3.3** Update UI to show seed-based music generation flow:
-  - Show seed info and styleMix (same as StreamingPlayer)
-  - Remove audio element, use streaming playback controls
+- [x] Gemini Lyria RealTime 实时音乐生成
+- [x] Gemini 2.5 Flash 文本生成（标题、描述、标签）
+- [x] SiliconFlow Kolors 封面图生成
+- [x] Monad Testnet ERC1155 NFT 合约部署
+- [x] SSE 流式音频播放
+- [x] 种子到风格映射算法（SeedToStyleMapper）
+- [x] 完整的生成 → 铸造 → 收藏流程
 
 ---
 
-### Phase 4: Cleanup & Verification
+### v1.1 Infrastructure (Completed)
 
-- [ ] **4.1** Remove IPFS upload dependencies if no longer needed:
-  - Clean up `lib/ipfs-client.ts` if unused
-  - Remove IPFS API routes if unused
+**去中心化存储优化**
 
-- [ ] **4.2** Test full flow:
-  - Generate music → Mint NFT → View in Collection → Play music
-
-- [ ] **4.3** Update README if needed
+- [x] 移除 IPFS 依赖，使用 Base64 Data URI
+- [x] SiliconFlow CDN 直链存储封面图
+- [x] 种子驱动的音乐重新生成（无需存储音频文件）
+- [x] 合约存储 seed + metadataUri
 
 ---
 
-## Technical Notes
+## In Progress
 
-### New Contract Structure
-```
-struct TokenData {
-    uint256 seed;
-    string imageUrl;
-    string title;
-}
-mapping(uint256 => TokenData) private _tokenData;
-```
+### v1.2 Algorithm Enhancement
 
-### Stream Interruption Logic
-```typescript
-// When switching NFTs
-const abortControllerRef = useRef<AbortController | null>(null);
+**问题**：当前种子生成逻辑导致风格离散分布——每种风格都沾一点，音乐趋于同质，大部分时候显得怪异。
 
-const handleNFTChange = (newTokenId) => {
-    // Abort previous stream
-    if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-    }
-    // Start new stream with new seed
-    startStream(..., newSeed, ...);
-};
-```
+**目标**：构建既有鲜明风格、抓耳好听，又充满探索性随机因素的音乐生成算法。
 
-### Image URL Storage
-- Store SiliconFlow CDN URL directly: `https://xxx.siliconflow.cn/...`
-- No IPFS conversion needed for display
+#### Tasks
+
+- [ ] **1.1 风格聚类算法**
+  - 研究 16 种风格的音乐学关联性
+  - 构建风格亲和度矩阵（Style Affinity Matrix）
+  - 实现风格组合的和谐度评分
+
+- [ ] **1.2 核心风格主导机制**
+  ```
+  当前：随机选择 2-16 种风格，权重随机分配
+  目标：确定 1-2 个核心主导风格（权重 50-70%），搭配 1-3 个辅助风格
+  ```
+
+- [ ] **1.3 风格组合模板库**
+  - 预定义"好听"的风格组合模板
+  - 模板权重：经典组合（Bossa Nova + Chillwave）vs 探索组合
+  - 种子决定：选择模板 + 在模板内随机
+
+- [ ] **1.4 和谐度约束**
+  ```typescript
+  // 示例：避免不和谐组合
+  const INCOMPATIBLE_PAIRS = [
+    ['Thrash Metal', 'Lush Strings'],  // 极端对立
+    ['Chiptune', 'Neo Soul'],          // 音色冲突
+  ];
+  ```
+
+- [ ] **1.5 动态 BPM 映射**
+  - 不同风格组合对应不同 BPM 范围
+  - Dubstep 核心 → 140 BPM
+  - Bossa Nova 核心 → 120-130 BPM
+
+---
+
+### v1.3 Narrative & Brand
+
+**核心理念**：*种下一颗记录你的心的旋律——它珍贵、永恒、忠实地记录你某一刻的感动*
+
+#### Tasks
+
+- [ ] **2.1 情感种子系统**
+  ```
+  当前：纯数字种子 → 风格组合
+  目标：情感输入 → 种子 → 风格组合
+  
+  输入维度：
+  - 心情选择（平静/忧伤/喜悦/怀旧/激情/孤独/希望）
+  - 时间标记（此刻/纪念某天/季节/时分）
+  - 场景联想（深夜独处/清晨/旅途/告别/重逢）
+  ```
+
+- [ ] **2.2 故事卡片生成**
+  - AI 生成"为什么这首歌属于你"的个性化故事
+  - 基于情感输入 + 音乐特征
+  - 生成双语故事文案
+
+- [ ] **2.3 时间胶囊功能**
+  - 铸造时可选设置"解锁时间"
+  - 封存某一刻的情感，未来某天开启
+  - 适合：生日礼物、纪念日、给未来的自己
+
+- [ ] **2.4 品牌叙事更新**
+  - 网站文案重构：强调"记录心灵"而非"生成音乐"
+  - Landing Page：情感引导式体验
+  - Slogan: "Every seed holds a story"
+
+- [ ] **2.5 音乐人格测试**
+  - 通过问卷生成"你的音乐人格种子"
+  - 可分享结果，引发社交传播
+  - 连接钱包即铸造人格 NFT
+
+---
+
+### v1.4 Value & Monetization
+
+**核心问题**：当音乐的故事由你一瞬的情感铸就，如何衡量将其化作永恒的价值？
+
+#### Tasks
+
+- [ ] **3.1 情感稀缺性定价模型**
+  ```
+  因素：
+  - 时间戳独特性（特定日期/时刻的稀缺度）
+  - 情感组合稀缺度（罕见情感组合溢价）
+  - 风格组合稀缺度（稀有风格组合）
+  
+  动态定价：
+  - 初始铸造：基础价格
+  - 转售：情感溢价 + 时间增值
+  ```
+
+- [ ] **3.2 情感共鸣市场**
+  - "有同样感受的人"匹配机制
+  - 基于音乐特征推荐相似情感 NFT
+  - 情感标签搜索
+
+- [ ] **3.3 创作者经济**
+  - 原创者版税（每次转售 5%）
+  - "被收藏"成就系统
+  - 情感影响力排行榜
+
+- [ ] **3.4 限量时刻系列**
+  - 特殊时间节点的限量铸造
+  - 新年限定、情人节限定、纪念日限定
+  - 时间戳铸入 NFT，不可复制
+
+- [ ] **3.5 企业/B2B 场景**
+  - 品牌定制音乐 NFT（品牌故事音乐化）
+  - 纪念品数字化（婚礼音乐 NFT）
+  - 企业年会的"团队之声"
+
+---
+
+## Future Exploration
+
+### v2.0 Social Layer
+
+- [ ] 情感社区：相同种子的人可以相聚
+- [ ] 音乐故事墙：公开分享你的音乐故事
+- [ ] 协作种子：多人共同种下一首歌
+
+### v2.1 Cross-Chain
+
+- [ ] 支持多链铸造（Base、Polygon、以太坊主网）
+- [ ] 跨链音乐 NFT 桥接
+
+### v2.2 AI Enhancement
+
+- [ ] 人声生成：为你的故事配上歌词
+- [ ] 音乐变奏：同一颗种子的不同演绎版本
+- [ ] 情感深度学习：更精准的情感→音乐映射
+
+### v3.0 Real World Integration
+
+- [ ] 实体黑胶唱片铸造
+- [ ] 音乐会/展览：MeloSeed 音乐展
+- [ ] 音乐疗愈：与心理健康平台合作
+
+---
+
+## Technical Debt
+
+- [ ] 音频格式标准化（当前 PCM → WAV/MP3 转换）
+- [ ] 错误处理与用户提示优化
+- [ ] 移动端适配优化
+- [ ] 性能优化：大音频文件的加载与缓存
+
+---
+
+## Research Topics
+
+1. **音乐心理学研究**
+   - 不同和弦进行的情感映射
+   - 风格组合的和谐度理论基础
+
+2. **NFT 定价模型**
+   - 动态定价算法研究
+   - 情感价值的量化方法
+
+3. **用户行为分析**
+   - 用户与生成音乐的互动模式
+   - 情感输入与音乐偏好的关联
+
+---
+
+## Contributing
+
+我们欢迎对音乐、AI、区块链、情感计算有热情的贡献者。
+
+**优先贡献领域**：
+- 风格和谐度算法优化
+- 情感分析模型
+- 音乐学专业知识
+
+---
+
+## Changelog
+
+### 2025-02
+- 完成 AI 三层能力集成（音乐/文本/图像）
+- 完成 Monad Testnet 部署
+- 确定 v1.2-v1.4 发展路线
+
+### 2025-01
+- 项目启动
+- 完成基础架构搭建
