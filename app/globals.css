@@ -90,6 +90,23 @@
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400;
   }
+
+  .album-spin {
+    animation: album-spin 20s linear infinite;
+  }
+  
+  .album-spin-paused {
+    animation-play-state: paused;
+  }
+
+  @keyframes album-spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
   
   /* Modern Scrollbar */
   ::-webkit-scrollbar {

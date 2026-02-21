@@ -113,8 +113,8 @@ export function StreamingPlayer({
     const barWidth = width / bars;
 
     const colors = styleMix.length > 0 
-      ? styleMix.map(s => s.color)
-      : ['#8b5cf6', '#a855f7', '#c084fc'];
+      ? styleMix.map(() => '#a1a1aa')
+      : ['#a1a1aa', '#d4d4d8', '#a1a1aa'];
 
     const animate = () => {
       ctx.clearRect(0, 0, width, height);
@@ -122,7 +122,7 @@ export function StreamingPlayer({
       for (let i = 0; i < bars; i++) {
         const phase = (i / bars) * Math.PI * 2;
         const wave = Math.sin(phase + currentTime * 0.5);
-        const amplitude = isPlaying ? 0.7 : 0.1;
+        const amplitude = isPlaying ? 0.5 : 0.08;
         const heightRatio = (wave * 0.5 + 0.5) * amplitude;
         const barHeight = Math.max(4, height * heightRatio);
         
@@ -130,8 +130,8 @@ export function StreamingPlayer({
         const color = colors[colorIndex];
         
         const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(1, color + '88');
+        gradient.addColorStop(0, color + '30');
+        gradient.addColorStop(1, color + '10');
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
@@ -187,15 +187,15 @@ export function StreamingPlayer({
                 src={coverUrl} 
                 alt={title}
                 className={cn(
-                  "w-full h-full object-cover transition-transform duration-[2s] rounded-full",
-                  isPlaying && "animate-[spin_8s_linear_infinite]"
+                  "w-full h-full object-cover rounded-full album-spin",
+                  !isPlaying && "album-spin-paused"
                 )}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/40 via-purple-500/30 to-secondary dark:from-primary/40 dark:via-purple-500/30 dark:to-secondary">
                 <div className={cn(
-                  "relative w-40 h-40 transition-transform duration-500",
-                  isPlaying && "animate-[spin_8s_linear_infinite]"
+                  "relative w-40 h-40 album-spin",
+                  !isPlaying && "album-spin-paused"
                 )}>
                   <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary to-purple-900 shadow-2xl" />
                   <div className="absolute inset-4 rounded-full bg-secondary flex items-center justify-center">
@@ -235,7 +235,14 @@ export function StreamingPlayer({
               )}
             </div>
 
-
+            <div className="h-10 w-full rounded-lg overflow-hidden bg-secondary/30 dark:bg-secondary/20 border border-border/50 relative">
+              <canvas 
+                ref={canvasRef}
+                width={320}
+                height={40}
+                className="w-full h-full opacity-40"
+              />
+            </div>
 
             {styleMix.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
