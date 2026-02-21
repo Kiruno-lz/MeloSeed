@@ -2,6 +2,13 @@ import { NextRequest } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { SeedToStyleMapper, DEFAULT_STYLES, seedToHash } from '@/lib/seed-mapper';
 
+const MODEL_VERSIONS: Record<string, string> = {
+  'Lyria RealTime': 'models/lyria-realtime-exp',
+  'Lyria RealTime Exp': 'models/lyria-realtime-exp',
+};
+
+const DEFAULT_MODEL = 'models/lyria-realtime-exp';
+
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -27,7 +34,7 @@ export async function POST(req: NextRequest) {
 
       (async () => {
         try {
-          const { prompt, seed, style, duration, bpm } = await req.json();
+          const { prompt, seed, style, duration, bpm, modelVersion } = await req.json();
           const targetSeed = seed || Math.floor(Math.random() * 1000000);
           const targetDuration = duration || 15;
 
@@ -47,10 +54,14 @@ export async function POST(req: NextRequest) {
 
           console.log(`🌱 Seed ${targetSeed} -> Hash: ${seedHash}`);
           console.log('🎵 Style Mix:', weightedPrompts.map(p => `${p.text}:${Math.round(p.weight*100)}%`).join(' | '));
-          console.log('🔊 Starting Lyria RealTime streaming...');
 
           const client = new GoogleGenAI({ apiKey: apiKey, apiVersion: 'v1alpha' });
-          const model = 'models/lyria-realtime-exp';
+          const model = modelVersion && MODEL_VERSIONS[modelVersion] 
+            ? MODEL_VERSIONS[modelVersion] 
+            : DEFAULT_MODEL;
+          
+          console.log(`🔊 Starting streaming with model: ${model} (version: ${modelVersion || 'default'})`);
+          
           const audioChunks: Uint8Array[] = [];
 
           const session = await client.live.music.connect({

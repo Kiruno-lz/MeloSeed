@@ -544,9 +544,7 @@ export default function Home() {
                         <div className="flex justify-center">
                             <NFTPlayer 
                                 collectionIds={tokenIds} 
-                                onBurn={() => {
-                                    setTimeout(() => refetchCollection(), 2000);
-                                }}
+                                onBurn={handleBurnComplete}
                             />
                         </div>
                     ) : (
@@ -555,7 +553,11 @@ export default function Home() {
                             <ConnectButton.Custom>
                                 {({ openConnectModal, mounted }) => {
                                   if (!mounted) return null;
-                                  return (
+  const handleBurnComplete = useCallback(() => {
+    setTimeout(() => refetchCollection(), 2000);
+  }, [refetchCollection]);
+
+  return (
                                     <button
                                       onClick={openConnectModal}
                                       className="
