@@ -476,6 +476,10 @@ export default function Home() {
     }
   };
 
+  const handleBurnComplete = useCallback(() => {
+    setTimeout(() => refetchCollection(), 2000);
+  }, [refetchCollection]);
+
   return (
     <div className="min-h-screen pb-20 pt-24 px-4 relative overflow-x-hidden flex flex-col">
         <Header currentView={view} setView={setView} />
