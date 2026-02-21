@@ -93,6 +93,8 @@ export default function Home() {
   };
 
   const playChunk = (base64Audio: string) => {
+    if (!isPlayingRef.current) return;
+    
     const ctx = initAudioContext();
     const floatData = decodeAudioChunk(base64Audio);
     
@@ -127,9 +129,14 @@ export default function Home() {
     source.start(nextStartTimeRef.current);
     nextStartTimeRef.current += audioBuffer.duration;
     
-    if (isPlayingRef.current) {
-      activeSourcesRef.current.push(source);
-    }
+    activeSourcesRef.current.push(source);
+    
+    source.onended = () => {
+      const index = activeSourcesRef.current.indexOf(source);
+      if (index > -1) {
+        activeSourcesRef.current.splice(index, 1);
+      }
+    };
   };
 
   const togglePlayPause = useCallback(() => {
@@ -137,15 +144,19 @@ export default function Home() {
     isPlayingRef.current = !isPlayingRef.current;
     setIsPlaying(isPlayingRef.current);
     
-    if (!willPause && gainNodeRef.current) {
-      if (audioContextRef.current?.state === 'suspended') {
+    if (!willPause && audioContextRef.current && gainNodeRef.current) {
+      if (audioContextRef.current.state === 'suspended') {
         audioContextRef.current.resume();
       }
-      gainNodeRef.current.gain.setValueAtTime(1, audioContextRef.current!.currentTime);
+      gainNodeRef.current.gain.cancelScheduledValues(audioContextRef.current.currentTime);
+      gainNodeRef.current.gain.setValueAtTime(0, audioContextRef.current.currentTime);
+      gainNodeRef.current.gain.linearRampToValueAtTime(1, audioContextRef.current.currentTime + 0.1);
     }
     
-    if (willPause && gainNodeRef.current && audioContextRef.current) {
-      gainNodeRef.current.gain.setValueAtTime(0, audioContextRef.current.currentTime);
+    if (willPause && audioContextRef.current && gainNodeRef.current) {
+      gainNodeRef.current.gain.cancelScheduledValues(audioContextRef.current.currentTime);
+      gainNodeRef.current.gain.setValueAtTime(1, audioContextRef.current.currentTime);
+      gainNodeRef.current.gain.linearRampToValueAtTime(0, audioContextRef.current.currentTime + 0.05);
       
       activeSourcesRef.current.forEach(source => {
         try {
@@ -154,6 +165,11 @@ export default function Home() {
       });
       activeSourcesRef.current = [];
       nextStartTimeRef.current = 0;
+      
+      gainNodeRef.current.disconnect();
+      gainNodeRef.current = audioContextRef.current.createGain();
+      gainNodeRef.current.gain.setValueAtTime(0, audioContextRef.current.currentTime);
+      gainNodeRef.current.connect(audioContextRef.current.destination);
     }
   }, []);
 
@@ -318,7 +334,8 @@ export default function Home() {
     isPlayingRef.current = false;
     setIsPlaying(false);
     
-    if (gainNodeRef.current && audioContextRef.current) {
+    if (audioContextRef.current && gainNodeRef.current) {
+      gainNodeRef.current.gain.cancelScheduledValues(audioContextRef.current.currentTime);
       gainNodeRef.current.gain.setValueAtTime(0, audioContextRef.current.currentTime);
     }
     
@@ -331,6 +348,9 @@ export default function Home() {
     nextStartTimeRef.current = 0;
     
     if (audioContextRef.current) {
+      if (gainNodeRef.current) {
+        gainNodeRef.current.disconnect();
+      }
       audioContextRef.current.close();
       audioContextRef.current = null;
       gainNodeRef.current = null;
