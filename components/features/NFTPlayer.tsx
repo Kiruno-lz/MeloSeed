@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlayCircle, Search, Disc, AlertCircle, Flame, ChevronDown, RefreshCw, Save, Music, Pause, Radio, Sparkles } from 'lucide-react';
+import { PlayCircle, Search, Disc, AlertCircle, Flame, ChevronDown, RefreshCw, Save, Music, Pause, Sparkles } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import * as Popover from '@radix-ui/react-popover';
 import { CONTRACT_ADDRESS, MELO_SEED_ABI } from '@/lib/constants';
@@ -81,45 +81,62 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
     }, []);
 
     const playChunk = useCallback((base64Audio: string) => {
-        if (!audioContextRef.current) {
-            audioContextRef.current = new AudioContext({ sampleRate: 48000 });
-        }
-        const ctx = audioContextRef.current;
-        if (ctx.state === 'suspended') {
-            ctx.resume();
-        }
-        
-        const floatData = decodeAudioChunk(base64Audio);
-        
-        const leftChannel = floatData;
-        const rightChannel = new Float32Array(floatData.length);
-        rightChannel.set(floatData);
-        
-        const interleaved = new Float32Array(leftChannel.length + rightChannel.length);
-        for (let i = 0; i < leftChannel.length; i++) {
-            interleaved[i * 2] = leftChannel[i];
-            interleaved[i * 2 + 1] = rightChannel[i];
-        }
-        
-        const audioBuffer = ctx.createBuffer(2, interleaved.length / 2, 48000);
-        audioBuffer.copyToChannel(leftChannel as Float32Array<ArrayBuffer>, 0);
-        audioBuffer.copyToChannel(rightChannel as Float32Array<ArrayBuffer>, 1);
-        
-        const source = ctx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(ctx.destination);
-        
-        const currentTime = ctx.currentTime;
-        if (nextStartTimeRef.current < currentTime) {
-            nextStartTimeRef.current = currentTime + 0.1;
-        }
-        
-        source.start(nextStartTimeRef.current);
-        nextStartTimeRef.current += audioBuffer.duration;
+        console.log('playChunk called, isPlayingRef.current:', isPlayingRef.current);
         
         if (!isPlayingRef.current) {
             isPlayingRef.current = true;
             setIsPlaying(true);
+        }
+        
+        if (!audioContextRef.current) {
+            audioContextRef.current = new AudioContext({ sampleRate: 48000 });
+        }
+        const ctx = audioContextRef.current;
+        
+        if (ctx.state === 'suspended') {
+            console.log('Resuming suspended AudioContext');
+            ctx.resume();
+        }
+        
+        try {
+            const floatData = decodeAudioChunk(base64Audio);
+            console.log('Decoded audio data length:', floatData.length);
+            
+            if (floatData.length === 0) {
+                console.error('Empty audio data');
+                return;
+            }
+            
+            const leftChannel = floatData;
+            const rightChannel = new Float32Array(floatData.length);
+            rightChannel.set(floatData);
+            
+            const audioBuffer = ctx.createBuffer(2, floatData.length, 48000);
+            audioBuffer.copyToChannel(leftChannel as Float32Array<ArrayBuffer>, 0);
+            audioBuffer.copyToChannel(rightChannel as Float32Array<ArrayBuffer>, 1);
+            
+            const source = ctx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(ctx.destination);
+            
+            const currentTime = ctx.currentTime;
+            if (nextStartTimeRef.current < currentTime) {
+                nextStartTimeRef.current = currentTime + 0.1;
+            }
+            
+            console.log('Starting audio at:', nextStartTimeRef.current, 'duration:', audioBuffer.duration);
+            source.start(nextStartTimeRef.current);
+            nextStartTimeRef.current += audioBuffer.duration;
+            
+            source.onerror = (e) => {
+                console.error('Audio source error:', e);
+            };
+            
+            source.onended = () => {
+                console.log('Audio chunk ended');
+            };
+        } catch (error) {
+            console.error('Error playing audio chunk:', error);
         }
     }, [decodeAudioChunk]);
 
@@ -430,14 +447,6 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-100 flex flex-col justify-end p-6">
                         
                         <div className="mb-4 transform translate-y-0 transition-transform duration-300 text-shadow-sm">
-                            <div className="flex items-center gap-2 mb-2">
-                                {seed !== undefined && (
-                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/20">
-                                        <Radio className="w-3 h-3 text-primary animate-pulse" />
-                                        <span className="text-xs font-medium text-primary">LIVE</span>
-                                    </div>
-                                )}
-                            </div>
                             <h2 className="text-2xl font-bold text-white mb-1 drop-shadow-md" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{title}</h2>
                             {seedHash && (
                                 <code className="text-xs font-mono text-white/60 mt-1 block">
@@ -465,50 +474,55 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
                             )}
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             {nftData && (
-                                <Button
-                                    onClick={handlePlayPause}
-                                    disabled={isFetching}
-                                    className={cn(
-                                        "w-full h-12 rounded-xl font-semibold transition-all duration-300",
-                                        isPlaying || isStreaming
-                                            ? "bg-secondary hover:bg-secondary/80 text-foreground border border-border"
-                                            : "bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 text-white shadow-lg shadow-primary/25"
-                                    )}
-                                >
-                                    {isStreaming ? (
-                                        <div className="flex items-center gap-2">
-                                            <span className="animate-spin text-lg">✺</span>
-                                            <span>Generating...</span>
-                                        </div>
-                                    ) : isPlaying ? (
-                                        <div className="flex items-center gap-2">
-                                            <Pause className="w-5 h-5" />
-                                            <span>Pause</span>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <PlayCircle className="w-5 h-5" />
-                                            <span>Play Music</span>
-                                        </div>
-                                    )}
-                                </Button>
-                            )}
+                                <>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={handlePlayPause}
+                                            disabled={isFetching}
+                                            className={cn(
+                                                "flex-1 h-12 rounded-xl font-semibold transition-all duration-300",
+                                                isPlaying || isStreaming
+                                                    ? "bg-secondary hover:bg-secondary/80 text-foreground border border-border"
+                                                    : "bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 text-white shadow-lg shadow-primary/25"
+                                            )}
+                                        >
+                                            {isStreaming ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="animate-spin text-lg">✺</span>
+                                                    <span>Generating...</span>
+                                                </div>
+                                            ) : isPlaying ? (
+                                                <div className="flex items-center gap-2">
+                                                    <Pause className="w-5 h-5" />
+                                                    <span>Pause</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <PlayCircle className="w-5 h-5" />
+                                                    <span>Play Music</span>
+                                                </div>
+                                            )}
+                                        </Button>
 
-                            {!isPreview && nftData && isOwner && (
-                                <div className="flex justify-end pt-2">
-                                    <Button 
-                                        variant="destructive" 
-                                        size="sm" 
-                                        onClick={handleBurn}
-                                        disabled={isBurning}
-                                        className="h-8 text-xs rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-200 border border-red-500/30 backdrop-blur-md"
-                                    >
-                                        {isBurning ? <span className="animate-spin mr-1">⏳</span> : <Flame className="w-3 h-3 mr-1" />}
-                                        Burn
-                                    </Button>
-                                </div>
+                                        {!isPreview && isOwner && (
+                                            <Button 
+                                                variant="destructive" 
+                                                size="sm" 
+                                            onClick={handleBurn}
+                                            disabled={isBurning}
+                                            className="h-12 px-4 text-xs rounded-xl bg-red-500/20 hover:bg-red-500/40 text-red-200 border border-red-500/30 backdrop-blur-md"
+                                        >
+                                            {isBurning ? <span className="animate-spin mr-1">⏳</span> : <Flame className="w-4 h-4 mr-1" />}
+                                            Burn
+                                        </Button>
+                                    )}
+                                    </div>
+                                    <p className="text-[10px] text-white/50 text-center">
+                                        {isPlaying ? 'Music is playing...' : isStreaming ? 'Generating audio in real-time...' : 'Click play to generate and listen to your unique sound'}
+                                    </p>
+                                </>
                             )}
                         </div>
                     </div>
