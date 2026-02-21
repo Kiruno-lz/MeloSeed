@@ -1,12 +1,12 @@
 require("@nomicfoundation/hardhat-ethers");
-require("dotenv").config({ path: '.env.local' });
+require("dotenv").config({ path: __dirname + '/../.env.local' });
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: "0.8.20",
   networks: {
     monadDevnet: {
-      url: process.env.NEXT_PUBLIC_MONAD_RPC_URL || "https://rpc-devnet.monad.xyz",
+      url: process.env.MONAD_RPC_URL || "https://monad-testnet.drpc.org",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 10143,
     },
