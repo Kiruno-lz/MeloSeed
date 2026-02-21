@@ -420,7 +420,7 @@ export default function Home() {
     }
   }, [isSuccess, showToast, refetchCollection, resetState]);
 
-  // Handle Mint - store seed, imageUrl, title directly on-chain
+  // Handle Mint - store full JSON metadata on-chain as data URI (base64)
   const handleMint = async () => {
     if (!generatedData) return;
     
@@ -436,11 +436,37 @@ export default function Home() {
     
     setIsUploading(true);
     try {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const modelVersion = "Lyria RealTime";
+        const tokenTitle = title || `MeloSeed #${generatedData.seed}`;
+        const tokenDescription = description || `A unique AI-generated melody seeded by ${generatedData.seed}.`;
+        
+        // Build complete JSON metadata (following ERC1155 metadata standard)
+        const metadata = {
+            name: tokenTitle,
+            description: tokenDescription,
+            image: coverUrl,
+            attributes: [
+                { trait_type: "Title", value: tokenTitle },
+                { trait_type: "Description", value: tokenDescription },
+                { trait_type: "Seed", value: String(generatedData.seed) },
+                { trait_type: "Model Version", value: modelVersion },
+                { trait_type: "Timestamp", value: String(timestamp) }
+            ]
+        };
+        
+        // Encode as base64 data URI (more compatible with NFT viewers)
+        const jsonStr = JSON.stringify(metadata);
+        const base64Json = typeof window !== 'undefined' 
+            ? btoa(unescape(encodeURIComponent(jsonStr)))
+            : Buffer.from(jsonStr).toString('base64');
+        const metadataUri = `data:application/json;base64,${base64Json}`;
+        
         writeContract({
             address: CONTRACT_ADDRESS,
             abi: MELO_SEED_ABI,
             functionName: 'mint',
-            args: [address, BigInt(1), BigInt(generatedData.seed), coverUrl, title || `MeloSeed #${generatedData.seed}`, "0x"],
+            args: [address, BigInt(1), BigInt(generatedData.seed), metadataUri, "0x"],
         });
     } catch (e) {
         console.error(e);
