@@ -8,7 +8,6 @@ import { StreamingPlayer } from '@/components/features/StreamingPlayer';
 import { MintingCard } from '@/components/features/MintingCard';
 import { NFTPlayer } from '@/components/features/NFTPlayer';
 import { useToast } from '@/components/Toast';
-import { uploadFileToIPFS, uploadJSONToIPFS } from '@/lib/ipfs-client';
 import { useMyCollection } from '@/lib/hooks/useMyCollection';
 import { CONTRACT_ADDRESS, MELO_SEED_ABI } from '@/lib/constants';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
@@ -90,7 +89,7 @@ export default function Home() {
     if (!isPlayingRef.current) return;
     
     const ctx = initAudioContext();
-    const floatData = decodeAudioChunk(base64Audio);
+    const floatData = decodeAudioChunk(base64Audio) as Float32Array<ArrayBuffer>;
     
     const audioBuffer = ctx.createBuffer(2, floatData.length, 48000);
     audioBuffer.copyToChannel(floatData, 0);
@@ -421,7 +420,7 @@ export default function Home() {
     }
   }, [isSuccess, showToast, refetchCollection, resetState]);
 
-  // Handle Mint - returns empty blob for audio since it's streaming
+  // Handle Mint - store seed, imageUrl, title directly on-chain
   const handleMint = async () => {
     if (!generatedData) return;
     
@@ -437,36 +436,15 @@ export default function Home() {
     
     setIsUploading(true);
     try {
-        let imageURI = "";
-        const coverRes = await fetch(coverUrl);
-        const coverBlob = await coverRes.blob();
-        imageURI = await uploadFileToIPFS(coverBlob);
-
-        const metadata = {
-            name: title,
-            description: description, 
-            image: imageURI,
-            animation_url: "",
-            attributes: [
-                { trait_type: "Seed", value: generatedData.seed.toString() },
-                { trait_type: "SeedHash", value: generatedData.seedHash || '' },
-                { trait_type: "Mood", value: generatedData.mood },
-                { trait_type: "Genre", value: generatedData.genre },
-                { trait_type: "Tags", value: generatedData.tags.join(', ') },
-                { trait_type: "StyleMix", value: (generatedData.styleMix || []).map(s => `${s.name}:${Math.round(s.weight*100)}%`).join('; ') }
-            ]
-        };
-        const tokenURI = await uploadJSONToIPFS(metadata);
-
         writeContract({
             address: CONTRACT_ADDRESS,
             abi: MELO_SEED_ABI,
             functionName: 'mint',
-            args: [address, BigInt(1), tokenURI, "0x"],
+            args: [address, BigInt(1), BigInt(generatedData.seed), coverUrl, title || `MeloSeed #${generatedData.seed}`, "0x"],
         });
     } catch (e) {
         console.error(e);
-        showToast("Upload failed: " + (e as Error).message, 'error');
+        showToast("Minting failed: " + (e as Error).message, 'error');
     } finally {
         setIsUploading(false);
     }

@@ -1,11 +1,13 @@
-export const CONTRACT_ADDRESS = '0xDfF0D0b3a294e22F86A99dD2DdE1d7810ab5Ca00';
+export const CONTRACT_ADDRESS = '0xNEW_CONTRACT_ADDRESS_HERE';
 
 export const MELO_SEED_ABI = [
   {
     inputs: [
       { internalType: 'address', name: 'account', type: 'address' },
       { internalType: 'uint256', name: 'amount', type: 'uint256' },
-      { internalType: 'string', name: 'tokenURI', type: 'string' },
+      { internalType: 'uint256', name: 'seed', type: 'uint256' },
+      { internalType: 'string', name: 'imageUrl', type: 'string' },
+      { internalType: 'string', name: 'title', type: 'string' },
       { internalType: 'bytes', name: 'data', type: 'bytes' },
     ],
     name: 'mint',
@@ -45,6 +47,17 @@ export const MELO_SEED_ABI = [
     ],
     name: 'balanceOfBatch',
     outputs: [{ internalType: 'uint256[]', name: '', type: 'uint256[]' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }],
+    name: 'getTokenData',
+    outputs: [
+      { internalType: 'uint256', name: 'seed', type: 'uint256' },
+      { internalType: 'string', name: 'imageUrl', type: 'string' },
+      { internalType: 'string', name: 'title', type: 'string' }
+    ],
     stateMutability: 'view',
     type: 'function',
   }

@@ -5,15 +5,14 @@ import path from 'path';
 import { SeedToStyleMapper, DEFAULT_STYLES, seedToHash } from '@/lib/seed-mapper';
 
 export class GeminiMusicAdapter implements IMusicGenerator {
-  private client: GoogleGenAI;
+  private client: GoogleGenAI | null = null;
   private defaultStyle = 'calm, soothing, gentle, relaxing, soft melody, ambient';
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not set');
+    if (apiKey) {
+      this.client = new GoogleGenAI({ apiKey, apiVersion: 'v1alpha' });
     }
-    this.client = new GoogleGenAI({ apiKey, apiVersion: 'v1alpha' });
   }
 
   async generate(options: MusicGenerationOptions): Promise<MusicGenerationResult> {
@@ -31,7 +30,7 @@ export class GeminiMusicAdapter implements IMusicGenerator {
       const duration = options.duration || 15;
 
       const mapper = new SeedToStyleMapper(seed);
-      const weightedPrompts = mapper.generateWeightedPrompts(DEFAULT_STYLES, 0.8);
+      const weightedPrompts = mapper.generateWeightedPrompts(DEFAULT_STYLES);
       
       const styleTexts = weightedPrompts.map(p => `${p.text} (${Math.round(p.weight * 100)}%)`).join(', ');
       const fullPrompt = `${styleTexts}${prompt ? `, ${prompt}` : ''}`.trim();
@@ -68,17 +67,27 @@ export class GeminiMusicAdapter implements IMusicGenerator {
     duration: number = 15,
     weightedPrompts: { text: string; weight: number; color: string }[] = []
   ): Promise<string> {
+    if (!this.client) {
+      console.warn('No GEMINI_API_KEY, using mock audio');
+      return '';
+    }
+    
     const model = 'models/lyria-realtime-exp';
     const audioChunks: Uint8Array[] = [];
     const targetDurationMs = duration * 1000;
     const startTime = Date.now();
 
     return new Promise((resolve, reject) => {
+      if (!this.client) {
+        resolve('');
+        return;
+      }
+      
       let session: any;
 
       const setupSession = async () => {
         try {
-          session = await this.client.live.music.connect({
+          session = await this.client!.live.music.connect({
             model,
             callbacks: {
               onmessage: (message: any) => {
@@ -154,7 +163,7 @@ export class GeminiMusicAdapter implements IMusicGenerator {
   private async getMockAudio(seed: number): Promise<MusicGenerationResult> {
     const musicPath = path.join(process.cwd(), 'public', 'assets', 'music_long.mp3');
     const mapper = new SeedToStyleMapper(seed);
-    const styleMix = mapper.generateWeightedPrompts(DEFAULT_STYLES, 0.8);
+    const styleMix = mapper.generateWeightedPrompts(DEFAULT_STYLES);
     
     try {
       const buffer = await fs.readFile(musicPath);

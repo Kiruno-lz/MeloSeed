@@ -74,8 +74,8 @@ export function useStreamingMusic(): UseStreamingMusicReturn {
     }
     
     const audioBuffer = ctx.createBuffer(2, interleaved.length / 2, 48000);
-    audioBuffer.copyToChannel(leftChannel, 0);
-    audioBuffer.copyToChannel(rightChannel, 1);
+    audioBuffer.copyToChannel(leftChannel as Float32Array<ArrayBuffer>, 0);
+    audioBuffer.copyToChannel(rightChannel as Float32Array<ArrayBuffer>, 1);
     
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;

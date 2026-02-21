@@ -1,16 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { IMusicAnalyzer, IMusicAnalyzerWithCover, MusicAnalysisResult, CompleteMusicMetadata } from './types';
-import { uploadFileToIPFS } from '../ipfs-client';
 
 export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
-  private client: GoogleGenerativeAI;
+  private client: GoogleGenerativeAI | null = null;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not set');
+    if (apiKey) {
+      this.client = new GoogleGenerativeAI(apiKey);
     }
-    this.client = new GoogleGenerativeAI(apiKey);
   }
 
   async analyze(audioData: ArrayBuffer): Promise<MusicAnalysisResult> {
@@ -22,6 +20,10 @@ export class GeminiAdapter implements IMusicAnalyzer, IMusicAnalyzerWithCover {
     }
 
     try {
+      if (!this.client) {
+        console.warn('No GEMINI_API_KEY found, returning mock analysis.');
+        return this.getMockAnalysis();
+      }
       const model = this.client.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
       const base64Audio = this.arrayBufferToBase64(audioData);
       
@@ -152,10 +154,8 @@ Make the description feel human and emotionally resonant - like something you'd 
 
       if (result.data && result.data[0]?.image) {
         const imageBase64 = result.data[0].image;
-        const buffer = Buffer.from(imageBase64, 'base64');
-        const blob = new Blob([buffer], { type: 'image/png' });
-        const coverUrl = await uploadFileToIPFS(blob);
-        return coverUrl;
+        console.warn('SiliconFlow returned base64 image, using fallback cover');
+        return '/logo.png';
       }
 
       return '/logo.png';
@@ -166,82 +166,11 @@ Make the description feel human and emotionally resonant - like something you'd 
   }
 
   private async generateCover(analysis: MusicAnalysisResult): Promise<string> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    
-    if (!apiKey) {
-      return '/logo.png';
-    }
-
-    try {
-      const coverPrompt = `Create an album cover art for a music track with the following characteristics:
-- Title: ${analysis.title}
-- Description: ${analysis.description}
-- Mood: ${analysis.mood}
-- Genre: ${analysis.genre}
-- Tags: ${analysis.tags.join(', ')}
-
-Create a beautiful, abstract, minimalistic album cover art with harmonious colors that match the mood. Style: modern, artistic, high quality digital art, 1024x1024.`;
-
-      const result = await this.client.models.generateImage({
-        model: 'imagen-3.0-generate-002',
-        prompt: coverPrompt,
-        config: {
-          numberOfImages: 1,
-          outputMimeType: 'image/jpeg',
-          aspectRatio: '1:1'
-        }
-      });
-
-      if (result.generatedImages && result.generatedImages.length > 0) {
-        const image = result.generatedImages[0];
-        if (image.image?.imageBytes) {
-          const imageBuffer = Buffer.from(image.image.imageBytes, 'base64');
-          const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
-          const coverUrl = await uploadFileToIPFS(blob);
-          return coverUrl;
-        }
-      }
-
-      return '/logo.png';
-    } catch (error) {
-      console.error('Cover generation error:', error);
-      return '/logo.png';
-    }
+    return '/logo.png';
   }
 
   async generateCoverFromPrompt(prompt: string): Promise<string> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    
-    if (!apiKey) {
-      return '/logo.png';
-    }
-
-    try {
-      const result = await this.client.models.generateImage({
-        model: 'imagen-3.0-generate-002',
-        prompt: prompt,
-        config: {
-          numberOfImages: 1,
-          outputMimeType: 'image/jpeg',
-          aspectRatio: '1:1'
-        }
-      });
-
-      if (result.generatedImages && result.generatedImages.length > 0) {
-        const image = result.generatedImages[0];
-        if (image.image?.imageBytes) {
-          const imageBuffer = Buffer.from(image.image.imageBytes, 'base64');
-          const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
-          const coverUrl = await uploadFileToIPFS(blob);
-          return coverUrl;
-        }
-      }
-
-      return '/logo.png';
-    } catch (error) {
-      console.error('Cover generation error:', error);
-      return '/logo.png';
-    }
+    return '/logo.png';
   }
 
   private arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -258,7 +187,7 @@ Create a beautiful, abstract, minimalistic album cover art with harmonious color
     
     const styleText = styleMix.map(s => `${s.name} (${Math.round(s.weight * 100)}%)`).join(', ');
     
-    if (!apiKey) {
+    if (!apiKey || !this.client) {
       console.warn('No GEMINI_API_KEY found, returning mock title from style mix.');
       return this.getMockAnalysisFromStyle(styleText);
     }

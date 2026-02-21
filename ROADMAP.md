@@ -1,49 +1,99 @@
-# Project Roadmap & Known Issues
+# Project Roadmap - Branch Refactoring
 
-This document tracks the current status of the project, completed milestones, and future plans.
+## Current Status
 
-## Current Status (MVP)
+This branch focuses on refactoring the smart contract and frontend to eliminate IPFS overhead:
+- **Images**: Will use SiliconFlow direct URLs instead of IPFS
+- **Music**: Will use seed-based streaming generation instead of stored MP3 files
+- **Storage**: Only seed and image URL will be stored on-chain
 
-The project has reached a stable MVP state on the Monad Devnet. Users can generate music, mint it as ERC1155 NFTs, view their collection, and play music directly from on-chain data (IPFS).
+---
 
-- **Contract**: `MeloSeed.sol` (ERC1155 + Burnable + Ownable).
-- **Network**: Monad Devnet.
-- **Storage**: IPFS (Pinata).
-- **AI**: Google AI Studio (Gemini API) - Music generation, title/description, cover images.
+## Tasks
 
-## Completed Milestones
+### Phase 1: Smart Contract Refactoring
 
-- [x] **Project Initialization**: Next.js + Hardhat setup.
-- [x] **Storage Refactor**: Moved from on-chain base64 (expensive) to IPFS (efficient).
-- [x] **Contract Upgrade**: Switched from ERC721 to ERC1155 for better batch handling and edition support.
-- [x] **Frontend Architecture**:
-    - Modularized components (`features/`).
-    - Centralized constants and utilities.
-- [x] **UX Improvements**:
-    - "Connect Wallet" landing view.
-    - Interactive "Ready to Mint" card.
-    - **Combobox Player**: Easy selection of owned NFTs.
-- [x] **Robustness**:
-    - Implemented `balanceOfBatch` strategy for reliable collection fetching on testnets.
-    - Added retry logic and timeouts for metadata fetching.
-    - Fallback mechanisms for AI generation (mock/local data).
+- [ ] **1.1** Update `MeloSeed.sol` to store seed and imageUrl directly:
+  - Add `seeds` mapping (uint256 => uint256) for music generation seed
+  - Add `imageUrls` mapping (uint256 => string) for SiliconFlow image URL
+  - Add `titles` mapping (uint256 => string) for music title
+  - Add `setTokenData` function to set seed, imageUrl, and title during mint
+  - Update `uri()` to return on-chain data format or IPFS fallback
 
-## Future Roadmap
+- [ ] **1.2** Deploy new contract to Monad Devnet
 
-### Phase 2: Social & Marketplace
-- [ ] **Marketplace**: Simple Buy/Sell functionality (Atomic Swap).
-- [ ] **Social Sharing**: "Share on X/Farcaster" buttons.
-- [ ] **Likes/Voting**: On-chain or off-chain voting for best melodies.
+- [ ] **1.3** Update `CONTRACT_ADDRESS` in `lib/constants.ts`
 
-### Phase 3: Advanced Generation
-- [x] **AI Music Generation**: Integrated Google AI Studio (Gemini API) for music generation, title/description, and cover image generation.
-- [ ] **Parameters**: Allow users to tweak generation parameters (BPM, Mood, Instrument).
+- [ ] **1.4** Update `MELO_SEED_ABI` in `lib/constants.ts` with new functions
 
-### Phase 4: Production Readiness
-- [ ] **Indexer**: Integrate The Graph or Goldsky for scalable NFT indexing.
-- [ ] **Mainnet Launch**: Deploy to Monad Mainnet.
+---
 
-## Known Issues
+### Phase 2: Minting Flow Updates
 
-1.  **RPC Limits**: The public Monad Devnet RPC has strict rate limits. If the collection fails to load, try refreshing after a few seconds.
-2.  **IPFS Latency**: Public IPFS gateways can be slow. The player has a 60s timeout for this reason.
+- [ ] **2.1** Modify `handleMint` in `app/page.tsx`:
+  - Use SiliconFlow image URL directly (remove IPFS upload)
+  - Call new contract function to store seed + imageUrl + title
+  - Remove metadata JSON upload to IPFS
+
+---
+
+### Phase 3: NFTPlayer Refactoring (Collection View)
+
+- [ ] **3.1** Refactor `NFTPlayer.tsx` to support seed-based streaming:
+  - Fetch seed and imageUrl from contract instead of IPFS metadata
+  - Integrate `useStreamingMusic` hook for playback
+  - Display styleMix derived from seed using `SeedToStyleMapper`
+
+- [ ] **3.2** Implement stream interruption:
+  - Add AbortController to abort previous stream when switching NFTs
+  - Ensure `stopStream()` is called before starting new NFT playback
+
+- [ ] **3.3** Update UI to show seed-based music generation flow:
+  - Show seed info and styleMix (same as StreamingPlayer)
+  - Remove audio element, use streaming playback controls
+
+---
+
+### Phase 4: Cleanup & Verification
+
+- [ ] **4.1** Remove IPFS upload dependencies if no longer needed:
+  - Clean up `lib/ipfs-client.ts` if unused
+  - Remove IPFS API routes if unused
+
+- [ ] **4.2** Test full flow:
+  - Generate music → Mint NFT → View in Collection → Play music
+
+- [ ] **4.3** Update README if needed
+
+---
+
+## Technical Notes
+
+### New Contract Structure
+```
+struct TokenData {
+    uint256 seed;
+    string imageUrl;
+    string title;
+}
+mapping(uint256 => TokenData) private _tokenData;
+```
+
+### Stream Interruption Logic
+```typescript
+// When switching NFTs
+const abortControllerRef = useRef<AbortController | null>(null);
+
+const handleNFTChange = (newTokenId) => {
+    // Abort previous stream
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+    }
+    // Start new stream with new seed
+    startStream(..., newSeed, ...);
+};
+```
+
+### Image URL Storage
+- Store SiliconFlow CDN URL directly: `https://xxx.siliconflow.cn/...`
+- No IPFS conversion needed for display

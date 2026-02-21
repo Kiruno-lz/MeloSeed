@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
           const targetDuration = duration || 15;
 
           const mapper = new SeedToStyleMapper(targetSeed);
-          const weightedPrompts = mapper.generateWeightedPrompts(DEFAULT_STYLES, 0.8);
+          const weightedPrompts = mapper.generateWeightedPrompts(DEFAULT_STYLES);
           
           const styleTexts = weightedPrompts.map(p => `${p.text} (${Math.round(p.weight * 100)}%)`).join(', ');
           const fullPrompt = `${styleTexts}${prompt ? `, ${prompt}` : ''}`.trim();
