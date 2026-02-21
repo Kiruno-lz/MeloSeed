@@ -27,23 +27,28 @@ export function useMyCollection(contractAddress: `0x${string}`) {
         
         setIsLoading(true);
         try {
-            const maxIdToCheck = 50; 
-            const idsToCheck = Array.from({ length: maxIdToCheck }, (_, i) => BigInt(i));
-            const userAddresses = Array(maxIdToCheck).fill(addr);
-
-            const balances = await client.readContract({
-                address: contract,
-                abi: MELO_SEED_ABI,
-                functionName: 'balanceOfBatch',
-                args: [userAddresses, idsToCheck]
-            }) as bigint[];
-
+            const maxIdToCheck = 50;
+            const batchSize = 10;
             const foundIds: bigint[] = [];
-            balances.forEach((bal, index) => {
-                if (bal > BigInt(0)) {
-                    foundIds.push(idsToCheck[index]);
-                }
-            });
+            
+            for (let start = 0; start < maxIdToCheck; start += batchSize) {
+                const end = Math.min(start + batchSize, maxIdToCheck);
+                const batchIds = Array.from({ length: end - start }, (_, i) => BigInt(start + i));
+                const batchAddresses = Array(end - start).fill(addr);
+
+                const balances = await client.readContract({
+                    address: contract,
+                    abi: MELO_SEED_ABI,
+                    functionName: 'balanceOfBatch',
+                    args: [batchAddresses, batchIds]
+                }) as bigint[];
+
+                balances.forEach((bal, index) => {
+                    if (bal > BigInt(0)) {
+                        foundIds.push(batchIds[index]);
+                    }
+                });
+            }
 
             setTokenIds(foundIds);
         } catch (e) {
