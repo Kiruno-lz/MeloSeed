@@ -5,7 +5,6 @@ import { useAccount, useWriteContract } from 'wagmi';
 import { Header } from '@/components/Header';
 import { Generator } from '@/components/features/Generator';
 import { StreamingPlayer } from '@/components/features/StreamingPlayer';
-import { BackgroundVisualizer } from '@/components/features/BackgroundVisualizer';
 import { MintingCard } from '@/components/features/MintingCard';
 import { NFTPlayer } from '@/components/features/NFTPlayer';
 import { useToast } from '@/components/Toast';
@@ -475,11 +474,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen pb-20 pt-24 px-4 relative overflow-x-hidden flex flex-col">
-        <BackgroundVisualizer 
-          audioContextRef={audioContextRef}
-          isPlaying={isPlaying && isStreaming}
-          styleMix={generatedData?.styleMix}
-        />
         <Header currentView={view} setView={setView} />
         
         <main className="container max-w-6xl mx-auto flex-1 flex flex-col justify-center">
@@ -500,16 +494,12 @@ export default function Home() {
                             <div className="order-1 lg:col-start-1 lg:row-start-1 w-full">
                                 {generatedData && (
                                     <StreamingPlayer 
-                                        audioBase64={generatedData.audioBase64}
                                         coverUrl={coverUrl}
                                         title={title || `MeloSeed #${generatedData.seed}`}
-                                        description={description}
                                         seed={generatedData.seed}
                                         seedHash={generatedData.seedHash}
                                         styleMix={generatedData.styleMix}
-                                        onRestart={handleRestart}
                                         className="sticky top-24"
-                                        isStreaming={isStreaming}
                                         isPlaying={isPlaying}
                                         onPlayPause={togglePlayPause}
                                     />

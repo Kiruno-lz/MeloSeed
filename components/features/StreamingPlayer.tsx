@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Play, Pause, Hash, Sparkles, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -12,80 +12,31 @@ interface StyleMixItem {
 }
 
 interface StreamingPlayerProps {
-  audioBase64?: string;
   coverUrl?: string | null;
   title?: string;
-  description?: string;
   seed?: number;
   seedHash?: string;
   styleMix?: StyleMixItem[];
-  onRestart?: () => void;
   className?: string;
-  autoPlay?: boolean;
-  isStreaming?: boolean;
   isPlaying?: boolean;
   onPlayPause?: () => void;
 }
 
 export function StreamingPlayer({
-  audioBase64,
   coverUrl,
   title = 'Untitled',
-  description = '',
   seed,
   seedHash,
   styleMix = [],
-  onRestart,
   className,
-  autoPlay = false,
-  isStreaming = false,
-  isPlaying: externalIsPlaying,
+  isPlaying = false,
   onPlayPause
 }: StreamingPlayerProps) {
-  const [internalIsPlaying, setInternalIsPlaying] = useState(false);
-  const isPlaying = externalIsPlaying !== undefined ? externalIsPlaying : internalIsPlaying;
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const audioSrc = audioBase64 ? `data:audio/mp3;base64,${audioBase64}` : null;
-
-  useEffect(() => {
-    if (!audioRef.current && audioSrc) {
-      audioRef.current = new Audio(audioSrc);
-      audioRef.current.loop = true;
-      if (autoPlay) {
-        audioRef.current.play().catch(console.error);
-      }
-    }
-  }, [audioSrc, autoPlay]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    const audio = audioRef.current;
-
-    const handlePlay = () => setInternalIsPlaying(true);
-    const handlePause = () => setInternalIsPlaying(false);
-
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-
-    return () => {
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-    };
-  }, []);
-
   const togglePlay = useCallback(() => {
     if (onPlayPause) {
       onPlayPause();
-    } else if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
-      }
     }
-  }, [isPlaying, onPlayPause]);
+  }, [onPlayPause]);
 
   return (
     <div className={cn("w-full max-w-sm mx-auto", className)}>
