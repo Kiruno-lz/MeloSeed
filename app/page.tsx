@@ -27,20 +27,13 @@ interface CompleteMusicData {
   seedHash?: string;
 }
 
-interface MusicReadyData {
-  seed: number;
-  seedHash: string;
-  styleMix?: { name: string; weight: number; color: string }[];
-}
-
 export default function Home() {
   const { address, isConnected } = useAccount();
   const [view, setView] = useState<'create' | 'collection'>('create');
   
-  // Streaming State - moved to parent to persist across component changes
+  // Streaming State
   const [isStreaming, setIsStreaming] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [streamInitData, setStreamInitData] = useState<MusicReadyData | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const isPlayingRef = useRef(false);
@@ -100,19 +93,9 @@ export default function Home() {
     const ctx = initAudioContext();
     const floatData = decodeAudioChunk(base64Audio);
     
-    const leftChannel = floatData;
-    const rightChannel = new Float32Array(floatData.length);
-    rightChannel.set(floatData);
-    
-    const interleaved = new Float32Array(leftChannel.length + rightChannel.length);
-    for (let i = 0; i < leftChannel.length; i++) {
-      interleaved[i * 2] = leftChannel[i];
-      interleaved[i * 2 + 1] = rightChannel[i];
-    }
-    
-    const audioBuffer = ctx.createBuffer(2, interleaved.length / 2, 48000);
-    audioBuffer.copyToChannel(leftChannel, 0);
-    audioBuffer.copyToChannel(rightChannel, 1);
+    const audioBuffer = ctx.createBuffer(2, floatData.length, 48000);
+    audioBuffer.copyToChannel(floatData, 0);
+    audioBuffer.copyToChannel(floatData, 1);
     
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
@@ -279,8 +262,6 @@ export default function Home() {
               if (eventType === 'init') {
                 hasReceivedInit = true;
                 console.log('Stream init received, setting generatedData, seed:', parsed.seed);
-                setStreamInitData(parsed);
-                // Immediately show the player with initial data
                 setGeneratedData({
                   seed: parsed.seed,
                   title: `MeloSeed #${parsed.seed}`,
@@ -359,19 +340,7 @@ export default function Home() {
     }
   };
 
-  // Handle restart - stop streaming and reset
-  const handleRestart = () => {
-    stopAllAudio();
-    setIsStreaming(false);
-    setGeneratedData(null);
-    setStreamInitData(null);
-    setCoverUrl(null);
-    setTitle('');
-    setDescription('');
-  };
-
   const stopAllAudio = useCallback(() => {
-    // Abort any ongoing stream request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -403,43 +372,26 @@ export default function Home() {
     }
   }, []);
 
-  // Effect: Handle view changes - stop audio and reset when leaving create view
+  const resetState = useCallback(() => {
+    stopAllAudio();
+    setIsStreaming(false);
+    setGeneratedData(null);
+    setCoverUrl(null);
+    setTitle('');
+    setDescription('');
+  }, [stopAllAudio]);
+
+  // Handle restart - stop streaming and reset
+  const handleRestart = () => {
+    resetState();
+  };
+
+  // Effect: Handle view changes - reset when leaving create view
   useEffect(() => {
     if (view !== 'create') {
-      // User navigated away from create view - stop all audio and reset
-      stopAllAudio();
-      setIsStreaming(false);
-      // Clear generated data to return to initial state
-      setGeneratedData(null);
-      setStreamInitData(null);
-      setCoverUrl(null);
-      setTitle('');
-      setDescription('');
+      resetState();
     }
-  }, [view, stopAllAudio]);
-
-  // Effect: Cleanup on component unmount
-  useEffect(() => {
-    return () => {
-      // Abort stream request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      // Stop all audio
-      activeSourcesRef.current.forEach(source => {
-        try {
-          source.stop();
-        } catch (e) {}
-      });
-      // Close audio context
-      if (audioContextRef.current) {
-        if (gainNodeRef.current) {
-          gainNodeRef.current.disconnect();
-        }
-        audioContextRef.current.close();
-      }
-    };
-  }, []);
+  }, [view, resetState]);
 
   // Effect: Set metadata when new music is generated
   useEffect(() => {
@@ -462,13 +414,13 @@ export default function Home() {
   useEffect(() => {
     if (isSuccess) {
       showToast('NFT Minted Successfully!', 'success');
-      handleRestart();
+      resetState();
       setTimeout(() => {
           refetchCollection();
           setView('collection');
       }, 2000);
     }
-  }, [isSuccess, showToast, refetchCollection]);
+  }, [isSuccess, showToast, refetchCollection, resetState]);
 
   // Handle Mint - returns empty blob for audio since it's streaming
   const handleMint = async () => {

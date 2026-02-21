@@ -62,12 +62,6 @@ export function BackgroundVisualizer({
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (!isPlaying) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        return;
-      }
-
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
       const maxRadius = Math.min(canvas.width, canvas.height) * 0.4;
@@ -77,7 +71,9 @@ export function BackgroundVisualizer({
         : 0.5;
 
       const baseRadius = maxRadius * 0.3;
-      const pulseRadius = baseRadius + avgFrequency * maxRadius * 0.5;
+      const pulseRadius = isPlaying 
+        ? baseRadius + avgFrequency * maxRadius * 0.5 
+        : baseRadius;
 
       for (let i = 0; i < 3; i++) {
         const layerRadius = pulseRadius * (1 + i * 0.3);
