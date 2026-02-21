@@ -186,7 +186,10 @@ export function StreamingPlayer({
               <img 
                 src={coverUrl} 
                 alt={title}
-                className="w-full h-full object-cover transition-transform duration-[2s] rounded-full"
+                className={cn(
+                  "w-full h-full object-cover transition-transform duration-[2s] rounded-full",
+                  isPlaying && "animate-[spin_8s_linear_infinite]"
+                )}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/40 via-purple-500/30 to-secondary dark:from-primary/40 dark:via-purple-500/30 dark:to-secondary">
@@ -208,7 +211,7 @@ export function StreamingPlayer({
             <div className="absolute inset-6 bg-gradient-to-t from-black/60 to-transparent rounded-full" />
           </div>
 
-          <div className="p-5 space-y-4">
+          <div className="px-5 pt-2 pb-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 dark:bg-secondary/30 rounded-full border border-primary/20">
                 <Radio className="w-3 h-3 text-primary animate-pulse" />
@@ -232,17 +235,7 @@ export function StreamingPlayer({
               )}
             </div>
 
-            <div className="h-12 w-full rounded-lg overflow-hidden bg-secondary/50 dark:bg-secondary/30 border border-border relative">
-              <canvas 
-                ref={canvasRef}
-                width={320}
-                height={48}
-                className="w-full h-full"
-              />
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-xs text-muted-foreground font-mono">{formatTime(currentTime)}</span>
-              </div>
-            </div>
+
 
             {styleMix.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
