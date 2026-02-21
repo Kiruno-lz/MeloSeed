@@ -6,8 +6,7 @@ export const MELO_SEED_ABI = [
       { internalType: 'address', name: 'account', type: 'address' },
       { internalType: 'uint256', name: 'amount', type: 'uint256' },
       { internalType: 'uint256', name: 'seed', type: 'uint256' },
-      { internalType: 'string', name: 'imageUrl', type: 'string' },
-      { internalType: 'string', name: 'title', type: 'string' },
+      { internalType: 'string', name: 'metadataUri', type: 'string' },
       { internalType: 'bytes', name: 'data', type: 'bytes' },
     ],
     name: 'mint',
@@ -55,8 +54,7 @@ export const MELO_SEED_ABI = [
     name: 'getTokenData',
     outputs: [
       { internalType: 'uint256', name: 'seed', type: 'uint256' },
-      { internalType: 'string', name: 'imageUrl', type: 'string' },
-      { internalType: 'string', name: 'title', type: 'string' }
+      { internalType: 'string', name: 'metadataUri', type: 'string' }
     ],
     stateMutability: 'view',
     type: 'function',

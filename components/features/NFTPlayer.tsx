@@ -22,8 +22,13 @@ interface StyleMixItem {
 
 interface NFTData {
     seed: number;
-    imageUrl: string;
-    title: string;
+    metadataUri: string;
+    parsedMetadata?: {
+        name: string;
+        description: string;
+        image: string;
+        attributes: Array<{ trait_type: string; value: string }>;
+    };
 }
 
 interface NFTPlayerProps {
@@ -265,12 +270,34 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
             setTimeout(() => reject(new Error('Timeout')), timeoutDuration);
         });
 
-        const data = await Promise.race([fetchPromise, timeoutPromise]) as [bigint, string, string];
+        const data = await Promise.race([fetchPromise, timeoutPromise]) as [bigint, string];
+        
+        let parsedMetadata = undefined;
+        if (data[1]) {
+            try {
+                let jsonStr = '';
+                if (data[1].startsWith('data:application/json;base64,')) {
+                    // Base64 encoded JSON
+                    const base64Str = data[1].slice('data:application/json;base64,'.length);
+                    jsonStr = atob(base64Str);
+                    // Handle UTF-8 encoding
+                    jsonStr = decodeURIComponent(jsonStr.split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+                } else if (data[1].startsWith('data:application/json,')) {
+                    // URL encoded JSON
+                    jsonStr = decodeURIComponent(data[1].slice('data:application/json,'.length));
+                }
+                if (jsonStr) {
+                    parsedMetadata = JSON.parse(jsonStr);
+                }
+            } catch (e) {
+                console.error('Failed to parse metadata:', e);
+            }
+        }
         
         return {
             seed: Number(data[0]),
-            imageUrl: data[1],
-            title: data[2]
+            metadataUri: data[1],
+            parsedMetadata
         };
     };
 
@@ -359,8 +386,8 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
     };
 
     const finalData = isPreview ? previewData : nftData;
-    const coverImage = isPreview ? previewData?.coverImage : (nftData?.imageUrl ?? null);
-    const title = isPreview ? previewData?.title : (nftData?.title || "Select an NFT");
+    const coverImage = isPreview ? previewData?.coverImage : (nftData?.parsedMetadata?.image ?? null);
+    const title = isPreview ? previewData?.title : (nftData?.parsedMetadata?.name || "Select an NFT");
     const seed = isPreview ? previewData?.seed : nftData?.seed;
     const seedHash = seed !== undefined ? seedToHash(seed) : undefined;
 
