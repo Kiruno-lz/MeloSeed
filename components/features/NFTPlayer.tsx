@@ -510,24 +510,7 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
                                 </code>
                             )}
                             
-                            {styleMix.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5 mt-2">
-                                    {styleMix.slice(0, 3).map((style, idx) => (
-                                        <div 
-                                            key={idx}
-                                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium"
-                                            style={{ 
-                                                backgroundColor: style.color + '20',
-                                                color: style.color,
-                                                border: `1px solid ${style.color}40`
-                                            }}
-                                        >
-                                            <Sparkles className="w-2.5 h-2.5" />
-                                            <span>{style.name}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+
                         </div>
 
                         <div className="space-y-2">
@@ -575,9 +558,7 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
                                         </Button>
                                     )}
                                     </div>
-                                    <p className="text-[10px] text-white/50 text-center">
-                                        {isPlaying ? 'Music is playing...' : isStreaming ? 'Generating audio in real-time...' : 'Click play to generate and listen to your unique sound'}
-                                    </p>
+
                                 </>
                             )}
                         </div>
