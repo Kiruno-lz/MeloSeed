@@ -29,6 +29,7 @@ interface NFTData {
         image: string;
         attributes: Array<{ trait_type: string; value: string }>;
     };
+    modelVersion?: string;
 }
 
 interface NFTPlayerProps {
@@ -67,6 +68,14 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
     
     const { writeContract, isPending: isBurning, isSuccess: isBurnSuccess, error: burnError } = useWriteContract();
     const { showToast } = useToast();
+    
+    const onBurnRef = useRef(onBurn);
+    const showToastRef = useRef(showToast);
+    
+    useEffect(() => {
+        onBurnRef.current = onBurn;
+        showToastRef.current = showToast;
+    }, [onBurn, showToast]);
 
     const decodeAudioChunk = useCallback((base64Data: string): Float32Array => {
         const binaryString = atob(base64Data);
@@ -86,12 +95,7 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
     }, []);
 
     const playChunk = useCallback((base64Audio: string) => {
-        console.log('playChunk called, isPlayingRef.current:', isPlayingRef.current);
-        
-        if (!isPlayingRef.current) {
-            isPlayingRef.current = true;
-            setIsPlaying(true);
-        }
+        if (!isPlayingRef.current) return;
         
         if (!audioContextRef.current) {
             audioContextRef.current = new AudioContext({ sampleRate: 48000 });
@@ -99,13 +103,11 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
         const ctx = audioContextRef.current;
         
         if (ctx.state === 'suspended') {
-            console.log('Resuming suspended AudioContext');
             ctx.resume();
         }
         
         try {
             const floatData = decodeAudioChunk(base64Audio);
-            console.log('Decoded audio data length:', floatData.length);
             
             if (floatData.length === 0) {
                 console.error('Empty audio data');
@@ -129,33 +131,35 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
                 nextStartTimeRef.current = currentTime + 0.1;
             }
             
-            console.log('Starting audio at:', nextStartTimeRef.current, 'duration:', audioBuffer.duration);
             source.start(nextStartTimeRef.current);
             nextStartTimeRef.current += audioBuffer.duration;
             
             source.onerror = (e) => {
                 console.error('Audio source error:', e);
             };
-            
-            source.onended = () => {
-                console.log('Audio chunk ended');
-            };
         } catch (error) {
             console.error('Error playing audio chunk:', error);
         }
     }, [decodeAudioChunk]);
 
-    const startStream = useCallback(async (seed: number, style: string, duration: number, bpm: number) => {
+    const startStream = useCallback(async (seed: number, style: string, duration: number, bpm: number, modelVersion?: string) => {
         if (currentSeedRef.current === seed && isStreaming) return;
         
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
         
+        if (audioContextRef.current) {
+            audioContextRef.current.close();
+            audioContextRef.current = null;
+        }
+        
+        audioContextRef.current = new AudioContext({ sampleRate: 48000 });
+        
         setIsStreaming(true);
-        setIsPlaying(false);
+        setIsPlaying(true);
+        isPlayingRef.current = true;
         nextStartTimeRef.current = 0;
-        isPlayingRef.current = false;
         currentSeedRef.current = seed;
 
         abortControllerRef.current = new AbortController();
@@ -164,7 +168,7 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
             const response = await fetch('/api/generate-music/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: '', seed, style, duration, bpm }),
+                body: JSON.stringify({ prompt: '', seed, style, duration, bpm, modelVersion }),
                 signal: abortControllerRef.current.signal
             });
 
@@ -187,37 +191,45 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
                 
                 buffer += decoder.decode(value, { stream: true });
                 
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
+                const events = buffer.split('\n\n');
+                buffer = events.pop() || '';
                 
-                for (const line of lines) {
-                    if (line.startsWith('event:')) {
-                        const eventEnd = line.indexOf('\n');
-                        const eventType = line.slice(6, eventEnd > 0 ? eventEnd : line.length).trim();
-                        const dataStart = line.indexOf('data:');
-                        if (dataStart > 0) {
-                            const data = line.slice(dataStart + 5).trim();
-                            try {
-                                const parsed = JSON.parse(data);
-                                
-                                if (eventType === 'init') {
-                                    console.log('Stream init received:', parsed);
-                                } else if (eventType === 'chunk') {
-                                    if (parsed.audio) {
-                                        playChunk(parsed.audio);
-                                    }
-                                } else if (eventType === 'playing') {
-                                    console.log('Music started playing');
-                                } else if (eventType === 'complete') {
-                                    console.log('Stream complete');
-                                    setIsStreaming(false);
-                                } else if (eventType === 'error') {
-                                    setError(parsed.error || 'Stream error');
-                                    setIsStreaming(false);
+                for (const event of events) {
+                    if (!event.trim()) continue;
+                    
+                    const lines = event.split('\n');
+                    let eventType = '';
+                    let eventData = '';
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('event:')) {
+                            eventType = line.slice(6).trim();
+                        } else if (line.startsWith('data:')) {
+                            eventData = line.slice(5).trim();
+                        }
+                    }
+                    
+                    if (eventType && eventData) {
+                        try {
+                            const parsed = JSON.parse(eventData);
+                            
+                            if (eventType === 'init') {
+                                console.log('Stream init received:', parsed);
+                            } else if (eventType === 'chunk') {
+                                if (parsed.audio) {
+                                    playChunk(parsed.audio);
                                 }
-                            } catch (e) {
-                                console.error('Failed to parse SSE data:', e);
+                            } else if (eventType === 'playing') {
+                                console.log('Music started playing');
+                            } else if (eventType === 'complete') {
+                                console.log('Stream complete');
+                                setIsStreaming(false);
+                            } else if (eventType === 'error') {
+                                setError(parsed.error || 'Stream error');
+                                setIsStreaming(false);
                             }
+                        } catch (e) {
+                            console.error('Failed to parse SSE data:', e);
                         }
                     }
                 }
@@ -233,30 +245,38 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
             }
             setIsStreaming(false);
             setIsPlaying(false);
+            isPlayingRef.current = false;
         }
     }, [isStreaming, playChunk]);
 
     const stopStream = useCallback(() => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        if (audioContextRef.current) {
+            audioContextRef.current.close();
+            audioContextRef.current = null;
         }
         setIsStreaming(false);
         setIsPlaying(false);
+        isPlayingRef.current = false;
         currentSeedRef.current = null;
+        nextStartTimeRef.current = 0;
     }, []);
 
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (isBurnSuccess) {
-            showToast("NFT Burned Successfully!", "success");
+            showToastRef.current("NFT Burned Successfully!", "success");
             setTokenId('');
             setQueryState({ id: null, attempts: 0 });
             stopStream();
-            if (onBurn) onBurn();
+            if (onBurnRef.current) onBurnRef.current();
         }
-        if (burnError) showToast("Failed to burn NFT: " + burnError.message, "error");
-    }, [isBurnSuccess, burnError, showToast, onBurn, stopStream]);
+        if (burnError) showToastRef.current("Failed to burn NFT: " + burnError.message, "error");
+    }, [isBurnSuccess, burnError, stopStream]);
 
     const fetchTokenData = async (id: bigint, attempt: number) => {
         const timeoutDuration = attempt < 2 ? 5000 : 60000; 
@@ -273,21 +293,24 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
         const data = await Promise.race([fetchPromise, timeoutPromise]) as [bigint, string];
         
         let parsedMetadata = undefined;
+        let modelVersion: string | undefined;
+        
         if (data[1]) {
             try {
                 let jsonStr = '';
                 if (data[1].startsWith('data:application/json;base64,')) {
-                    // Base64 encoded JSON
                     const base64Str = data[1].slice('data:application/json;base64,'.length);
                     jsonStr = atob(base64Str);
-                    // Handle UTF-8 encoding
                     jsonStr = decodeURIComponent(jsonStr.split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
                 } else if (data[1].startsWith('data:application/json,')) {
-                    // URL encoded JSON
                     jsonStr = decodeURIComponent(data[1].slice('data:application/json,'.length));
                 }
                 if (jsonStr) {
                     parsedMetadata = JSON.parse(jsonStr);
+                    const modelAttr = parsedMetadata.attributes?.find(
+                        (attr: { trait_type: string; value: string }) => attr.trait_type === 'Model Version'
+                    );
+                    modelVersion = modelAttr?.value;
                 }
             } catch (e) {
                 console.error('Failed to parse metadata:', e);
@@ -297,7 +320,8 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
         return {
             seed: Number(data[0]),
             metadataUri: data[1],
-            parsedMetadata
+            parsedMetadata,
+            modelVersion
         };
     };
 
@@ -380,7 +404,8 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
                 nftData.seed,
                 'calm, soothing, gentle, relaxing, soft melody, ambient, peaceful, dreamy',
                 15,
-                80
+                80,
+                nftData.modelVersion
             );
         }
     };
@@ -388,6 +413,7 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
     const finalData = isPreview ? previewData : nftData;
     const coverImage = isPreview ? previewData?.coverImage : (nftData?.parsedMetadata?.image ?? null);
     const title = isPreview ? previewData?.title : (nftData?.parsedMetadata?.name || "Select an NFT");
+    const description = isPreview ? previewData?.description : (nftData?.parsedMetadata?.description ?? '');
     const seed = isPreview ? previewData?.seed : nftData?.seed;
     const seedHash = seed !== undefined ? seedToHash(seed) : undefined;
 
@@ -475,6 +501,9 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
                         
                         <div className="mb-4 transform translate-y-0 transition-transform duration-300 text-shadow-sm">
                             <h2 className="text-2xl font-bold text-white mb-1 drop-shadow-md" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{title}</h2>
+                            {description && (
+                                <p className="text-sm text-white/70 mt-1 line-clamp-2">{description}</p>
+                            )}
                             {seedHash && (
                                 <code className="text-xs font-mono text-white/60 mt-1 block">
                                     Seed Hash: {seedHash}
