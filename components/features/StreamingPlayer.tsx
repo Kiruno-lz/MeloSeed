@@ -44,12 +44,7 @@ export function StreamingPlayer({
 }: StreamingPlayerProps) {
   const [internalIsPlaying, setInternalIsPlaying] = useState(false);
   const isPlaying = externalIsPlaying !== undefined ? externalIsPlaying : internalIsPlaying;
-  const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const animationRef = useRef<number | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamStartTimeRef = useRef<number>(0);
-  const streamElapsedRef = useRef<number>(0);
 
   const audioSrc = audioBase64 ? `data:audio/mp3;base64,${audioBase64}` : null;
 
@@ -70,92 +65,15 @@ export function StreamingPlayer({
 
     const handlePlay = () => setInternalIsPlaying(true);
     const handlePause = () => setInternalIsPlaying(false);
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
 
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, []);
-
-  useEffect(() => {
-    if (isStreaming && isPlaying) {
-      if (streamStartTimeRef.current === 0) {
-        streamStartTimeRef.current = Date.now() - (streamElapsedRef.current * 1000);
-      }
-      
-      const interval = setInterval(() => {
-        streamElapsedRef.current = (Date.now() - streamStartTimeRef.current) / 1000;
-        setCurrentTime(streamElapsedRef.current);
-      }, 100);
-      
-      return () => clearInterval(interval);
-    } else if (!isPlaying) {
-      streamStartTimeRef.current = 0;
-    }
-  }, [isStreaming, isPlaying]);
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const width = canvas.width;
-    const height = canvas.height;
-    const bars = 48;
-    const barWidth = width / bars;
-
-    const colors = styleMix.length > 0 
-      ? styleMix.map(() => '#a1a1aa')
-      : ['#a1a1aa', '#d4d4d8', '#a1a1aa'];
-
-    const animate = () => {
-      ctx.clearRect(0, 0, width, height);
-
-      for (let i = 0; i < bars; i++) {
-        const phase = (i / bars) * Math.PI * 2;
-        const wave = Math.sin(phase + currentTime * 0.5);
-        const amplitude = isPlaying ? 0.5 : 0.08;
-        const heightRatio = (wave * 0.5 + 0.5) * amplitude;
-        const barHeight = Math.max(4, height * heightRatio);
-        
-        const colorIndex = Math.floor((i / bars) * colors.length);
-        const color = colors[colorIndex];
-        
-        const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
-        gradient.addColorStop(0, color + '30');
-        gradient.addColorStop(1, color + '10');
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.roundRect(
-          i * barWidth + 1,
-          height - barHeight,
-          barWidth - 2,
-          barHeight,
-          2
-        );
-        ctx.fill();
-      }
-
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [isPlaying, currentTime, styleMix]);
 
   const togglePlay = useCallback(() => {
     if (onPlayPause) {
@@ -168,12 +86,6 @@ export function StreamingPlayer({
       }
     }
   }, [isPlaying, onPlayPause]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   return (
     <div className={cn("w-full max-w-sm mx-auto", className)}>
@@ -233,15 +145,6 @@ export function StreamingPlayer({
                   {seedHash}
                 </code>
               )}
-            </div>
-
-            <div className="h-10 w-full rounded-lg overflow-hidden bg-secondary/30 dark:bg-secondary/20 border border-border/50 relative">
-              <canvas 
-                ref={canvasRef}
-                width={320}
-                height={40}
-                className="w-full h-full opacity-40"
-              />
             </div>
 
             {styleMix.length > 0 && (

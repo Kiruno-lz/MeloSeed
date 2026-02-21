@@ -48,8 +48,8 @@ export function BackgroundVisualizer({
     }
 
     const colors = styleMix.length > 0 
-      ? styleMix.map(s => s.color)
-      : ['#8b5cf6', '#a855f7', '#c084fc', '#c026d3'];
+      ? ['#9a8c8c', '#b5a6a6', '#c4b8b8', '#a89f9f']
+      : ['#9a8c8c', '#b5a6a6', '#c4b8b8', '#a89f9f'];
 
     const draw = () => {
       if (!ctx || !canvas) return;
@@ -77,7 +77,7 @@ export function BackgroundVisualizer({
 
       for (let i = 0; i < 3; i++) {
         const layerRadius = pulseRadius * (1 + i * 0.3);
-        const alpha = 0.15 - i * 0.04;
+        const alpha = 0.08 - i * 0.02;
         
         const gradient = ctx.createRadialGradient(
           centerX, centerY, layerRadius * 0.5,
@@ -117,7 +117,7 @@ export function BackgroundVisualizer({
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
-        ctx.strokeStyle = color + 'aa';
+        ctx.strokeStyle = color + '40';
         ctx.lineWidth = barWidth;
         ctx.lineCap = 'round';
         ctx.stroke();
@@ -139,8 +139,8 @@ export function BackgroundVisualizer({
       ref={canvasRef}
       className="fixed inset-0 w-full h-full pointer-events-none z-0"
       style={{
-        filter: 'blur(60px)',
-        opacity: 0.8,
+        filter: 'blur(100px)',
+        opacity: 0.5,
       }}
     />
   );
