@@ -13,7 +13,7 @@ MeloSeed is a next-generation decentralized application that combines real-time 
 | Feature | Technology | Description |
 |---------|------------|-------------|
 | **Music Generation** | Gemini Lyria RealTime | Real-time streaming audio generation with weighted style mixing |
-| **Text Generation** | Gemini 2.5 Flash Lite | Poetic titles, descriptions, tags, mood & genre analysis |
+| **Text Generation**  | Gemini 2.5 Flash Lite | Poetic titles, descriptions, tags, mood & genre analysis |
 | **Image Generation** | Kwai-Kolors/Kolors (SiliconFlow) | Album cover art based on music mood and style |
 
 ### Blockchain Features
@@ -35,23 +35,23 @@ MeloSeed is a next-generation decentralized application that combines real-time 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         User Interface                          │
-│  ┌──────────┐  ┌──────────────┐  ┌─────────────┐               │
-│  │Generator │  │StreamingPlayer│  │MintingCard │               │
-│  └────┬─────┘  └──────┬───────┘  └──────┬──────┘               │
-└───────┼───────────────┼─────────────────┼───────────────────────┘
-        │               │                 │
-        ▼               ▼                 ▼
 ┌───────────────────────────────────────────────────────────────┐
-│                        API Routes                              │
+│                         User Interface                        │
+│  ┌──────────┐  ┌───────────────┐  ┌─────────────┐             │
+│  │Generator │  │StreamingPlayer│  │MintingCard  │             │
+│  └────┬─────┘  └──────┬────────┘  └──────┬──────┘             │
+└───────┼───────────────┼──────────────────┼────────────────────┘
+        │               │                  │
+        ▼               ▼                  ▼
+┌───────────────────────────────────────────────────────────────┐
+│                        API Routes                             │
 │  /api/generate-music/stream  /api/generate-title              │
-│  /api/generate-cover-gemini  /api/ipfs/upload                 │
+│              /api/generate-cover-gemini                       │
 └───────────────────────────────────────────────────────────────┘
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│                        AI Services                             │
+│                        AI Services                            │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌────────────────┐ │
 │  │ Gemini Lyria    │  │ Gemini 2.5      │  │ SiliconFlow    │ │
 │  │ RealTime        │  │ Flash Lite      │  │ Kolors         │ │
@@ -61,7 +61,7 @@ MeloSeed is a next-generation decentralized application that combines real-time 
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│                     Blockchain Layer                           │
+│                     Blockchain Layer                          │
 │  ┌─────────────────┐  ┌─────────────────┐                     │
 │  │ Monad Testnet   │  │ ERC1155 Contract│                     │
 │  │ (Chain ID:10143)│  │ MeloSeed.sol    │                     │
@@ -211,7 +211,7 @@ MeloSeed/
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/meloseed.git
+git clone https://github.com/Kiruno-lz/MeloSeed.git
 cd meloseed
 
 # Install dependencies
@@ -230,9 +230,6 @@ NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=your_wallet_connect_id
 GEMINI_API_KEY=your_gemini_api_key
 SILICON_FLOW_API_KEY=your_siliconflow_key
 
-# Storage (optional)
-PINATA_JWT=your_pinata_jwt
-
 # Contract Deployment
 PRIVATE_KEY=your_deployer_private_key
 ```
@@ -246,8 +243,6 @@ npm run compile
 # Deploy to Monad Testnet
 npm run deploy
 ```
-
-Update `CONTRACT_ADDRESS` in `lib/constants.ts` after deployment.
 
 ### Run Development Server
 
@@ -368,7 +363,7 @@ Generate album cover image.
 
 ## License
 
-ISC
+GPL-v3
 
 ---
 
@@ -378,4 +373,5 @@ ISC
 - [SiliconFlow](https://siliconflow.cn/) - Kwai-Kolors Image Generation
 - [Monad](https://monad.xyz/) - High-performance blockchain
 - [OpenZeppelin](https://openzeppelin.com/) - Smart contract libraries
+- [RainbowKit](https://www.rainbowkit.com/) - Wallet connection
 - [shadcn/ui](https://ui.shadcn.com/) - UI components
