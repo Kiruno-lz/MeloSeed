@@ -48,3 +48,8 @@ ai-models/ckpt/**
 scripts/**
 
 .trae
+
+plans
+
+# TypeScript build info
+tsconfig.tsbuildinfo

@@ -125,6 +125,12 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
   /** 用于取消流请求的 AbortController */
   const abortControllerRef = useRef<AbortController | null>(null);
   
+  /** 当前会话的 sessionId */
+  const sessionIdRef = useRef<string | null>(null);
+  
+  /** 当前会话的 token */
+  const sessionTokenRef = useRef<string | null>(null);
+
   /** 当前正在播放的 seed（防止重复启动） */
   const currentSeedRef = useRef<number | null>(null);
   
@@ -133,6 +139,29 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
   const { writeContract, isPending: isBurning, isSuccess: isBurnSuccess, error: burnError, reset: resetBurnState } = useWriteContract();
   const { showToast } = useToast();
   
+  /**
+   * 服务器端会话控制
+   * 
+   * 向服务器发送控制请求来暂停/停止 Lyria 会话
+   */
+  const serverControl = useCallback(async (action: 'pause' | 'stop' | 'reset') => {
+    const sessionId = sessionIdRef.current;
+    const token = sessionTokenRef.current;
+    if (!sessionId || !token) {
+      return;
+    }
+    
+    try {
+      await fetch('/api/generate-music/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, sessionId, token })
+      });
+    } catch (e) {
+      console.error('Failed to control session:', e);
+    }
+  }, []);
+
   /** 使用 ref 存储回调，避免 useEffect 依赖问题 */
   const onBurnRef = useRef(onBurn);
   const showToastRef = useRef(showToast);
@@ -320,6 +349,12 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
     // 防止重复启动同一 seed 的流
     if (currentSeedRef.current === seed && isStreaming) return;
     
+    // 先停止之前的会话
+    if (sessionIdRef.current) {
+      await serverControl('stop');
+      sessionIdRef.current = null;
+    }
+    
     // 中断之前的流
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -375,6 +410,9 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
               
               if (eventType === 'chunk' && parsed.audio) {
                 audioStream.playChunk(parsed.audio);
+              } else if (eventType === 'init' && parsed.sessionId) {
+                sessionIdRef.current = parsed.sessionId;
+                sessionTokenRef.current = parsed.sessionToken || null;
               } else if (eventType === 'complete') {
                 setIsStreaming(false);
               } else if (eventType === 'error') {
@@ -402,7 +440,14 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
   /**
    * 停止音乐流
    */
-  const stopStream = useCallback(() => {
+  const stopStream = useCallback(async () => {
+    // 停止服务器端会话
+    if (sessionIdRef.current) {
+      await serverControl('stop');
+      sessionIdRef.current = null;
+      sessionTokenRef.current = null;
+    }
+    
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -410,7 +455,7 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
     audioStream.reset();
     setIsStreaming(false);
     currentSeedRef.current = null;
-  }, [audioStream]);
+  }, [audioStream, serverControl]);
 
   // ============ 副作用 ============
 

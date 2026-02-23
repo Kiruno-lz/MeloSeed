@@ -78,6 +78,12 @@ export default function Home() {
    */
   const abortControllerRef = useRef<AbortController | null>(null);
   
+  /** 当前会话的 sessionId */
+  const sessionIdRef = useRef<string | null>(null);
+  
+  /** 当前会话的 token，用于验证会话所有权 */
+  const sessionTokenRef = useRef<string | null>(null);
+  
   // ============ 生成状态 ============
   /** 是否正在流式生成音乐 */
   const [isStreaming, setIsStreaming] = useState(false);
@@ -104,6 +110,39 @@ export default function Home() {
   const isPending = isUploading || isTxPending;
 
   // ============ 核心业务逻辑 ============
+
+  /**
+   * 服务器端会话控制
+   * 
+   * 向服务器发送控制请求来暂停/停止 Lyria 会话
+   * 
+   * @param action - 控制动作: 'pause' | 'stop' | 'reset'
+   */
+  const serverControl = useCallback(async (action: 'pause' | 'stop' | 'reset') => {
+    const sessionId = sessionIdRef.current;
+    const token = sessionTokenRef.current;
+    if (!sessionId || !token) {
+      console.log('⚠️ No session ID or token to control');
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/generate-music/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, sessionId, token })
+      });
+      
+      const result = await response.json();
+      if (!result.success) {
+        console.warn('⚠️ Server control failed:', result.error);
+      } else {
+        console.log(`✅ Server ${action} successful`);
+      }
+    } catch (e) {
+      console.error('❌ Failed to control session:', e);
+    }
+  }, []);
 
   /**
    * 启动音乐生成流
@@ -191,6 +230,13 @@ export default function Home() {
               const parsed = JSON.parse(eventData);
               
               if (eventType === 'init') {
+                // 保存 sessionId 和 token
+                if (parsed.sessionId) {
+                  sessionIdRef.current = parsed.sessionId;
+                  sessionTokenRef.current = parsed.sessionToken || null;
+                  console.log(`🔑 Saved session ID: ${parsed.sessionId}, token: ${parsed.sessionToken ? 'present' : 'missing'}`);
+                }
+                
                 // 初始化事件 - 设置基础数据
                 setGeneratedData({
                   seed: parsed.seed,
@@ -268,18 +314,28 @@ export default function Home() {
    * - 切换到收藏视图
    * - 铸造成功后
    */
-  const resetState = useCallback(() => {
+  const resetState = useCallback(async () => {
+    // 首先尝试停止服务器端会话
+    if (sessionIdRef.current) {
+      await serverControl('stop');
+    }
+    
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    
+    // 清理 sessionId
+    sessionIdRef.current = null;
+    sessionTokenRef.current = null;
+    
     audioStream.reset();
     setIsStreaming(false);
     setGeneratedData(null);
     setCoverUrl(null);
     setTitle('');
     setDescription('');
-  }, [audioStream]);
+  }, [audioStream, serverControl]);
 
   const handleRestart = () => resetState();
 
@@ -414,7 +470,17 @@ export default function Home() {
                       styleMix={generatedData.styleMix}
                       className="sticky top-24"
                       isPlaying={audioStream.isPlaying}
-                      onPlayPause={audioStream.togglePlayPause}
+                      onPlayPause={() => {
+                        if (audioStream.isPlaying) {
+                          // 暂停：停止客户端音频
+                          audioStream.stopPlaying();
+                          // 可选：通知服务器暂停
+                          // serverControl('pause');
+                        } else {
+                          // 恢复：开始客户端音频
+                          audioStream.startPlaying();
+                        }
+                      }}
                     />
                   )}
                 </div>
