@@ -3,6 +3,9 @@
  * 
  * This module provides functions to upload files and JSON to IPFS
  * for permanent storage of NFT assets.
+ * 
+ * Pinata now uses JWT authentication. Get your JWT from:
+ * https://app.pinata.cloud/keys
  */
 
 const PINATA_API_URL = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
@@ -15,11 +18,10 @@ const PINATA_JSON_URL = 'https://api.pinata.cloud/pinning/pinJSONToIPFS';
  * @returns IPFS hash (CID) prefixed with ipfs://
  */
 export async function uploadFileToIPFS(file: Blob): Promise<string> {
-  const apiKey = process.env.PINATA_API_KEY;
-  const apiSecret = process.env.PINATA_API_SECRET;
+  const jwt = process.env.PINATA_JWT;
 
-  if (!apiKey || !apiSecret) {
-    throw new Error('Pinata API credentials not configured');
+  if (!jwt) {
+    throw new Error('Pinata JWT not configured. Set PINATA_JWT in .env.local');
   }
 
   const formData = new FormData();
@@ -28,8 +30,7 @@ export async function uploadFileToIPFS(file: Blob): Promise<string> {
   const response = await fetch(PINATA_API_URL, {
     method: 'POST',
     headers: {
-      'pinata_api_key': apiKey,
-      'pinata_secret_api_key': apiSecret,
+      'Authorization': `Bearer ${jwt}`,
     },
     body: formData,
   });
@@ -51,19 +52,17 @@ export async function uploadFileToIPFS(file: Blob): Promise<string> {
  * @returns IPFS hash (CID) prefixed with ipfs://
  */
 export async function uploadJSONToIPFS(json: any, name?: string): Promise<string> {
-  const apiKey = process.env.PINATA_API_KEY;
-  const apiSecret = process.env.PINATA_API_SECRET;
+  const jwt = process.env.PINATA_JWT;
 
-  if (!apiKey || !apiSecret) {
-    throw new Error('Pinata API credentials not configured');
+  if (!jwt) {
+    throw new Error('Pinata JWT not configured. Set PINATA_JWT in .env.local');
   }
 
   const response = await fetch(PINATA_JSON_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'pinata_api_key': apiKey,
-      'pinata_secret_api_key': apiSecret,
+      'Authorization': `Bearer ${jwt}`,
     },
     body: JSON.stringify({
       pinataContent: json,

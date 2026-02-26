@@ -141,6 +141,7 @@ function deriveMusicConfig(seed: number, customConfig?: Partial<MusicGenerationC
     
     // Scale: musical scale
     scale: pickOption(12, scales),
+    // scale: 'SCALE_UNSPECIFIED',
     
     // Music generation mode
     music_generation_mode: 'QUALITY',
