@@ -110,43 +110,50 @@ function deriveMusicConfig(seed: number, customConfig?: Partial<MusicGenerationC
   };
   
   // Musical scales
-  const scales = ['major', 'minor', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'pentatonic', 'blues'];
-  
-  // Generation modes
-  const modes = ['full', 'melody', 'accompaniment', 'bass'];
+  const scales = [
+    'C_MAJOR_A_MINOR', 
+    'D_FLAT_MAJOR_B_FLAT_MINOR',
+    'D_MAJOR_B_MINOR', 
+    'E_FLAT_MAJOR_C_MINOR', 
+    'E_MAJOR_D_FLAT_MINOR', 
+    'F_MAJOR_D_MINOR', 
+    'G_FLAT_MAJOR_E_FLAT_MINOR', 
+    'G_MAJOR_E_MINOR',
+    'A_FLAT_MAJOR_F_MINOR',
+    'A_MAJOR_G_FLAT_MINOR',
+    'B_FLAT_MAJOR_G_MINOR',
+    'B_MAJOR_A_FLAT_MINOR'
+  ];
   
   // Base config derived from seed
   const derived: MusicGenerationConfig = {
-    // Guidance: 1-10, default around 7
-    guidance: Math.round(mapToRange(0, 3, 10)),
+    // Guidance: 0-6, default around 6
+    guidance: 6,
     
-    // BPM: 60-180, typical range for electronic music
-    bpm: Math.round(mapToRange(1, 70, 160)),
+    // BPM: 60-200, typical range for electronic music
+    bpm: Math.round(mapToRange(1, 60, 200)),
     
-    // Density: 1-10, how busy the arrangement is
-    density: Math.round(mapToRange(2, 2, 9)),
+    // Density: 0-1, how busy the arrangement is
+    density: Math.round(mapToRange(1, 0, 1)),
     
-    // Brightness: 1-10, brightness/timbre of sound
-    brightness: Math.round(mapToRange(3, 3, 10)),
+    // Brightness: 0-1, brightness/timbre of sound
+    brightness: Math.round(mapToRange(1, 0, 1)),
     
     // Scale: musical scale
-    scale: pickOption(4, scales),
+    scale: pickOption(12, scales),
     
     // Music generation mode
-    music_generation_mode: pickOption(5, modes),
+    music_generation_mode: 'QUALITY',
     
-    // Temperature: 0.1-2.0, randomness in generation
-    temperature: parseFloat(mapToRange(6, 0.3, 1.5).toFixed(2)),
+    // Temperature: 0.0-3.0, randomness in generation
+    temperature: parseFloat(mapToRange(1, 0, 3).toFixed(2)),
     
-    // Top K: 1-100, number of candidates
-    top_k: Math.round(mapToRange(7, 20, 80)),
+    // Top K: 1-1000, number of candidates
+    top_k: Math.round(mapToRange(1, 1, 1000)),
     
     // Seed: use the provided seed
     seed: seed,
     
-    // Audio format - fixed for now
-    audioFormat: 'pcm16',
-    sampleRateHz: 44100
   };
   
   // Override with custom config if provided

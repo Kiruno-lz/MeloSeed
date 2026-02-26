@@ -146,7 +146,7 @@ Make the description feel human and emotionally resonant - like something you'd 
       }
 
       const result = await response.json();
-      console.log('Silicon Flow response:', JSON.stringify(result));
+      // console.log('Silicon Flow response:', JSON.stringify(result));
       
       if (result.data && result.data[0]?.url) {
         return result.data[0].url;

@@ -397,6 +397,34 @@ export default function Home() {
     
     setIsUploading(true);
     try {
+      // Upload cover image to IPFS first
+      let ipfsImageUrl = coverUrl;
+      
+      if (coverUrl && !coverUrl.startsWith('ipfs://')) {
+        try {
+          showToast("Uploading cover to IPFS...", "info");
+          const coverRes = await fetch(coverUrl);
+          const coverBlob = await coverRes.blob();
+          
+          // Create FormData for upload
+          const formData = new FormData();
+          formData.append('file', coverBlob, 'cover.png');
+          
+          const uploadRes = await fetch('/api/ipfs/upload', {
+            method: 'POST',
+            body: formData
+          });
+          const uploadData = await uploadRes.json();
+          if (uploadData.ipfshash) {
+            ipfsImageUrl = uploadData.ipfshash;
+            console.log(`📸 Cover uploaded to IPFS: ${ipfsImageUrl}`);
+          }
+        } catch (uploadError) {
+          console.error('Failed to upload cover to IPFS:', uploadError);
+          // Continue with original URL if upload fails
+        }
+      }
+      
       const timestamp = Math.floor(Date.now() / 1000);
       const tokenTitle = title || `MeloSeed #${generatedData.seed}`;
       const tokenDescription = description || `A unique AI-generated melody seeded by ${generatedData.seed}.`;
@@ -405,7 +433,7 @@ export default function Home() {
       const metadata = {
         name: tokenTitle,
         description: tokenDescription,
-        image: coverUrl,
+        image: ipfsImageUrl,
         attributes: [
           { trait_type: "Title", value: tokenTitle },
           { trait_type: "Description", value: tokenDescription },
