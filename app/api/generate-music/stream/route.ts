@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { SeedToStyleMapper, DEFAULT_STYLES, seedToHash } from '@/lib/seed-mapper';
+import { SeedDecoder, decodeSeed, formatInstrumentsForPrompt, formatMoodsForPrompt } from '@/lib/seed-decoder';
 
 const MODEL_VERSIONS: Record<string, string> = {
   'Lyria RealTime': 'models/lyria-realtime-exp',
@@ -91,7 +92,27 @@ interface MusicGenerationConfig {
  * @param customConfig - Optional custom config to override derived values
  * @returns Complete music generation config
  */
-function deriveMusicConfig(seed: number, customConfig?: Partial<MusicGenerationConfig>): MusicGenerationConfig {
+function deriveMusicConfig(seedInput: number | string, customConfig?: Partial<MusicGenerationConfig>): MusicGenerationConfig {
+  // Use SeedDecoder for string seeds (new approach with richer parameters)
+  if (typeof seedInput === 'string') {
+    const decoderConfig = decodeSeed(seedInput);
+    // Always use seed-derived bpm, ignore custom bpm to ensure deterministic randomness
+    return {
+      guidance: 6, // Fixed value
+      bpm: decoderConfig.bpm, // Always from seed, not customConfig
+      density: decoderConfig.density,
+      brightness: decoderConfig.brightness,
+      scale: decoderConfig.scale,
+      music_generation_mode: decoderConfig.music_generation_mode,
+      temperature: decoderConfig.temperature,
+      top_k: decoderConfig.top_k,
+      seed: decoderConfig.seed,
+    };
+  }
+
+  // Fallback to original numeric seed implementation
+  const seed = seedInput;
+  
   // Simple deterministic random using seed
   const seededRandom = (index: number): number => {
     const x = Math.sin(seed * 9999 + index * 999) * 10000;
@@ -296,16 +317,35 @@ function handleStreamRequest(req: NextRequest) {
       (async () => {
         try {
           const { prompt, seed, style, duration, bpm, modelVersion } = await req.json();
-          const targetSeed = seed || Math.floor(Math.random() * 1000000);
+          
+          // Handle seed: support any string, convert numbers to strings, or generate random
+          let targetSeed: string;
+          if (seed === undefined || seed === null || seed === '') {
+            // Generate random seed if not provided
+            targetSeed = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+          } else if (typeof seed === 'number') {
+            // Convert number to string
+            targetSeed = String(seed);
+          } else {
+            // Use string seed directly
+            targetSeed = String(seed);
+          }
+          
           const targetDuration = duration || 15;
 
-          const mapper = new SeedToStyleMapper(targetSeed);
+          // Use SeedDecoder for richer parameter generation
+          const decoder = new SeedDecoder(targetSeed);
+          const decoderConfig = decoder.generateConfig();
+          
+          // Also create style prompts for backward compatibility
+          const numericSeed = decoderConfig.seed;
+          const mapper = new SeedToStyleMapper(numericSeed);
           const weightedPrompts = mapper.generateWeightedPrompts(DEFAULT_STYLES);
           
           const styleTexts = weightedPrompts.map(p => `${p.text} (${Math.round(p.weight * 100)}%)`).join(', ');
           const fullPrompt = `${styleTexts}${prompt ? `, ${prompt}` : ''}`.trim();
 
-          const seedHash = seedToHash(targetSeed);
+          const seedHash = seedToHash(numericSeed);
           
           // Generate session ID and token
           sessionId = generateSessionId();
@@ -319,8 +359,10 @@ function handleStreamRequest(req: NextRequest) {
             sessionToken
           })}\n\n`);
 
-          console.log(`🌱 Seed ${targetSeed} -> Hash: ${seedHash}`);
+          console.log(`🌱 Seed "${targetSeed}" -> Internal Seed: ${numericSeed}, Hash: ${seedHash}`);
           console.log('🎵 Style Mix:', weightedPrompts.map(p => `${p.text}:${Math.round(p.weight*100)}%`).join(' | '));
+          console.log('🎹 Instruments:', decoderConfig.instruments.map(i => i.name).join(', '));
+          console.log('🎭 Genre:', decoderConfig.genre, '| Moods:', decoderConfig.moods.join(', '));
           console.log(`🔑 Session ID: ${sessionId}`);
 
           const client = new GoogleGenAI({ apiKey: apiKey, apiVersion: 'v1alpha' });
@@ -402,8 +444,9 @@ function handleStreamRequest(req: NextRequest) {
               : [{ text: fullPrompt, weight: 1.0 }]
           });
 
-          // Derive music generation config from seed
-          const musicConfig = deriveMusicConfig(targetSeed, { bpm });
+          // Derive music generation config from seed (using string seed for richer parameters)
+          const seedString = String(targetSeed);
+          const musicConfig = deriveMusicConfig(seedString, { bpm });
           
           console.log('🎛️ Music config:', {
             bpm: musicConfig.bpm,

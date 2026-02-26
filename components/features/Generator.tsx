@@ -8,14 +8,14 @@ import { Sparkles, Dice5, SlidersHorizontal, Music, FileText, ImageIcon } from '
 import { cn } from '@/lib/utils';
 
 interface GeneratorProps {
-  onGenerate: (prompt: string, seed: number, style: string, duration: number, bpm: number) => void;
+  onGenerate: (prompt: string, seed: string, style: string, duration: number, bpm: number) => void;
 }
 
 type GenerationStage = 'idle' | 'generating';
 
 export function Generator({ onGenerate }: GeneratorProps) {
   const [prompt, setPrompt] = useState('');
-  const [seed, setSeed] = useState(Math.floor(Math.random() * 1000000));
+  const [seed, setSeed] = useState<string | number>(Math.floor(Math.random() * 1000000));
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<GenerationStage>('idle');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -44,7 +44,7 @@ export function Generator({ onGenerate }: GeneratorProps) {
     
     onGenerate(
       prompt,
-      seed,
+      String(seed),
       'calm, soothing, gentle, relaxing, soft melody, ambient, peaceful, dreamy',
       15,
       80
@@ -153,16 +153,17 @@ export function Generator({ onGenerate }: GeneratorProps) {
                                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Seed</label>
                                 <div className="flex gap-2">
                                     <Input
-                                        type="number"
+                                        type="text"
                                         value={seed}
-                                        onChange={(e) => setSeed(Number(e.target.value))}
+                                        onChange={(e) => setSeed(e.target.value)}
+                                        placeholder="Enter any text or number"
                                         className="flex-1 font-mono bg-background/50 border-transparent focus:bg-background transition-all"
                                     />
                                     <Button
                                         variant="outline"
                                         size="icon"
                                         onClick={() => setSeed(Math.floor(Math.random() * 1000000))}
-                                        title="Randomize Seed"
+                                        title="Randomize Seed (Number)"
                                         className="bg-background/50 border-transparent hover:bg-background"
                                     >
                                         <Dice5 className="w-4 h-4" />

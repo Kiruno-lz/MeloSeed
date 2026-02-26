@@ -162,7 +162,7 @@ export default function Home() {
    * @param duration - 生成时长 (秒)
    * @param bpm - 节拍速度
    */
-  const startStreaming = async (prompt: string, seed: number, style: string, duration: number, bpm: number) => {
+  const startStreaming = async (prompt: string, seed: string, style: string, duration: number, bpm: number) => {
     // 中断之前的流
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
