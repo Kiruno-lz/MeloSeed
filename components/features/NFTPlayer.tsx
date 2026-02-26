@@ -50,8 +50,11 @@ interface StyleMixItem {
 
 /** 从链上读取的 NFT 数据 */
 interface NFTData {
+  /** 原始 seed 字符串（支持任意字符包括 emoji 和中文） */
   seed: string;
+  /** 元数据 URI */
   metadataUri: string;
+  /** 解析后的元数据 */
   parsedMetadata?: {
     name: string;
     description: string;
@@ -230,7 +233,8 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
     }
     
     return {
-      seed: Number(data[0]),
+      // 保持 seed 为原始字符串（支持任意字符包括 emoji 和中文）
+      seed: data[0],
       metadataUri: data[1],
       parsedMetadata,
       modelVersion
@@ -250,8 +254,13 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
   /** 当 NFT 数据变化时，更新风格混合 */
   useEffect(() => {
     if (nftData) {
+      // 将字符串 seed 转换为数字用于风格映射
+      const numericSeed = typeof nftData.seed === 'string' 
+        ? parseInt(nftData.seed.split('').reduce((acc, char) => acc + char.charCodeAt(0).toString(16), ''), 16) % 2147483647
+        : nftData.seed;
+      
       // 根据 seed 生成确定性的风格混合
-      const mapper = new SeedToStyleMapper(nftData.seed);
+      const mapper = new SeedToStyleMapper(numericSeed);
       const mix = mapper.generateWeightedPrompts(DEFAULT_STYLES).map(s => ({
         name: s.text,
         weight: s.weight,
@@ -339,15 +348,20 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
    * - 不生成标题和封面（这些已经在铸造时生成并存储在链上）
    * - 只处理 chunk, complete, error 事件
    * 
-   * @param seed - 音乐种子
+   * @param seed - 音乐种子（字符串，支持任意字符包括 emoji 和中文）
    * @param style - 风格描述
    * @param duration - 时长
    * @param bpm - 节拍
    * @param modelVersion - 模型版本
    */
-  const startStream = useCallback(async (seed: number, style: string, duration: number, bpm: number, modelVersion?: string) => {
+  const startStream = useCallback(async (seed: string, style: string, duration: number, bpm: number, modelVersion?: string) => {
+    // 将字符串 seed 转换为数字用于防止重复播放检查
+    const numericSeed = typeof seed === 'string' 
+      ? parseInt(seed.split('').reduce((acc, char) => acc + char.charCodeAt(0).toString(16), ''), 16) % 2147483647
+      : seed;
+    
     // 防止重复启动同一 seed 的流
-    if (currentSeedRef.current === seed && isStreaming) return;
+    if (currentSeedRef.current === numericSeed && isStreaming) return;
     
     // 先停止之前的会话
     if (sessionIdRef.current) {
@@ -365,7 +379,7 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
     
     setIsStreaming(true);
     audioStream.startPlaying();
-    currentSeedRef.current = seed;
+    currentSeedRef.current = numericSeed;
 
     abortControllerRef.current = new AbortController();
 
@@ -498,12 +512,41 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
 
   // ============ 派生显示数据 ============
 
+  // 辅助函数：将字符串 seed 转换为数字
+  const stringSeedToNumber = (s: string | number | undefined): number | undefined => {
+    if (s === undefined) return undefined;
+    if (typeof s === 'number') return s;
+    // 将字符串转换为数字（用于 hash 函数）
+    return parseInt(s.split('').reduce((acc, char) => acc + char.charCodeAt(0).toString(16), ''), 16) % 2147483647;
+  };
+
+  // 辅助函数：处理 IPFS 图片 URL
+  // 支持：ipfs://xxx,Qmxxx,或直接 URL
+  const processImageUrl = (url: string | null): string | null => {
+    if (!url) return null;
+    // 如果已经是完整 URL，直接返回
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+      return url;
+    }
+    // 如果是 IPFS hash，转换为 IPFS 网关 URL
+    if (url.startsWith('ipfs://')) {
+      // 使用公共 IPFS 网关
+      return `https://ipfs.io/ipfs/${url.slice(7)}`;
+    }
+    // 裸 IPFS hash (Qm..., bafy...)
+    if (url.startsWith('Qm') || url.startsWith('bafy')) {
+      return `https://ipfs.io/ipfs/${url}`;
+    }
+    // 其他情况直接返回
+    return url;
+  };
+
   const finalData = isPreview ? previewData : nftData;
-  const coverImage = isPreview ? previewData?.coverImage : (nftData?.parsedMetadata?.image ?? null);
+  const coverImage = isPreview ? previewData?.coverImage : processImageUrl(nftData?.parsedMetadata?.image ?? null);
   const title = isPreview ? previewData?.title : (nftData?.parsedMetadata?.name || "Select an NFT");
   const description = isPreview ? previewData?.description : (nftData?.parsedMetadata?.description ?? '');
   const seed = isPreview ? previewData?.seed : nftData?.seed;
-  const seedHash = seed !== undefined ? seedToHash(seed) : undefined;
+  const seedHash = seed !== undefined ? seedToHash(stringSeedToNumber(seed) ?? 0) : undefined;
 
   // ============ 渲染 ============
 
@@ -599,9 +642,9 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
               {description && (
                 <p className="text-sm text-white/70 mt-1 line-clamp-2">{description}</p>
               )}
-              {seedHash && (
+              {seed && (
                 <code className="text-xs font-mono text-white/60 mt-1 block">
-                  Seed Hash: {seedHash}
+                  Seed: {seed}
                 </code>
               )}
             </div>

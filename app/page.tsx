@@ -135,12 +135,18 @@ export default function Home() {
       
       const result = await response.json();
       if (!result.success) {
-        console.warn('⚠️ Server control failed:', result.error);
+        // Session not found is OK - it might have expired or been cleaned up
+        if (result.error?.includes('Session not found')) {
+          console.log('ℹ️ Session already cleaned up (expected in serverless)');
+        } else {
+          console.warn('⚠️ Server control failed:', result.error);
+        }
       } else {
         console.log(`✅ Server ${action} successful`);
       }
     } catch (e) {
-      console.error('❌ Failed to control session:', e);
+      // Ignore network errors - session might have expired
+      console.log('ℹ️ Server control skipped (session may have expired)');
     }
   }, []);
 
@@ -162,7 +168,7 @@ export default function Home() {
    * @param duration - 生成时长 (秒)
    * @param bpm - 节拍速度
    */
-  const startStreaming = async (prompt: string, seed: string, style: string, duration: number, bpm: number) => {
+  const startStreaming = async (seed: string) => {
     // 中断之前的流
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -182,7 +188,7 @@ export default function Home() {
       const response = await fetch('/api/generate-music/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, seed, style, duration, bpm }),
+        body: JSON.stringify({ seed }),
         signal: abortController.signal
       });
 
@@ -482,7 +488,7 @@ export default function Home() {
             {!generatedData ? (
               /* 初始状态 - 显示生成器 */
               <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                <Generator onGenerate={startStreaming} />
+                <Generator onGenerate={(seed) => startStreaming(seed)} />
               </div>
             ) : (
               /* 预览状态 - 显示播放器和铸造表单 */

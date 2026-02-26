@@ -316,7 +316,7 @@ function handleStreamRequest(req: NextRequest) {
 
       (async () => {
         try {
-          const { prompt, seed, style, duration, bpm, modelVersion } = await req.json();
+          const { seed, style, duration, bpm, modelVersion } = await req.json();
           
           // Handle seed: support any string, convert numbers to strings, or generate random
           let targetSeed: string;
@@ -343,7 +343,7 @@ function handleStreamRequest(req: NextRequest) {
           const weightedPrompts = mapper.generateWeightedPrompts(DEFAULT_STYLES);
           
           const styleTexts = weightedPrompts.map(p => `${p.text} (${Math.round(p.weight * 100)}%)`).join(', ');
-          const fullPrompt = `${styleTexts}${prompt ? `, ${prompt}` : ''}`.trim();
+          const fullPrompt = `${styleTexts}`.trim();
 
           const seedHash = seedToHash(numericSeed);
           

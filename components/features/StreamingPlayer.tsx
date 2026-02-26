@@ -14,7 +14,7 @@ interface StyleMixItem {
 interface StreamingPlayerProps {
   coverUrl?: string | null;
   title?: string;
-  seed?: number;
+  seed?: string | number;
   seedHash?: string;
   styleMix?: StyleMixItem[];
   className?: string;
@@ -74,20 +74,7 @@ export function StreamingPlayer({
             <div className="absolute inset-6 bg-gradient-to-t from-black/60 to-transparent rounded-full" />
           </div>
 
-          <div className="px-5 pt-2 pb-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 dark:bg-secondary/30 rounded-full border border-primary/20">
-                <Radio className="w-3 h-3 text-primary animate-pulse" />
-                <span className="text-xs font-medium text-primary">LIVE</span>
-              </div>
-              
-              {seed !== undefined && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-secondary/50 dark:bg-secondary/30 rounded-full border border-border">
-                  <Hash className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs font-mono text-foreground">{seed}</span>
-                </div>
-              )}
-            </div>
+          <div className="px-5 pt-0 pb-5 space-y-4">
 
             <div>
               <h2 className="text-lg font-bold text-foreground truncate leading-tight">{title}</h2>

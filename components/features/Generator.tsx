@@ -4,21 +4,19 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Dice5, SlidersHorizontal, Music, FileText, ImageIcon } from 'lucide-react';
+import { Sparkles, Dice5, Music, FileText, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface GeneratorProps {
-  onGenerate: (prompt: string, seed: string, style: string, duration: number, bpm: number) => void;
+  onGenerate: (seed: string) => void;
 }
 
 type GenerationStage = 'idle' | 'generating';
 
 export function Generator({ onGenerate }: GeneratorProps) {
-  const [prompt, setPrompt] = useState('');
   const [seed, setSeed] = useState<string | number>(Math.floor(Math.random() * 1000000));
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<GenerationStage>('idle');
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const getStageText = () => {
     switch (stage) {
@@ -43,11 +41,7 @@ export function Generator({ onGenerate }: GeneratorProps) {
     setStage('generating');
     
     onGenerate(
-      prompt,
-      String(seed),
-      'calm, soothing, gentle, relaxing, soft melody, ambient, peaceful, dreamy',
-      15,
-      80
+      String(seed)
     );
   };
 
@@ -120,57 +114,26 @@ export function Generator({ onGenerate }: GeneratorProps) {
                     {!loading && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite]" />}
                 </Button>
 
-                {/* Advanced Options Toggle */}
-                <div className="space-y-4">
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setShowAdvanced(!showAdvanced)}
-                        className="w-full text-muted-foreground hover:text-foreground"
-                    >
-                        <SlidersHorizontal className="w-4 h-4 mr-2" />
-                        {showAdvanced ? "Hide Advanced" : "Advanced Options"}
-                    </Button>
-                    
-                    {/* Collapsible Content */}
-                    <div className={cn(
-                        "grid gap-4 overflow-hidden transition-all duration-300 ease-in-out",
-                        showAdvanced ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-                    )}>
-                        <div className="min-h-0 space-y-4 p-4 bg-secondary/30 rounded-xl border border-white/10 overflow-hidden">
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Prompt (Optional)</label>
-                                <Input
-                                    type="text"
-                                    value={prompt}
-                                    onChange={(e) => setPrompt(e.target.value)}
-                                    placeholder="e.g. Cyberpunk rain, Lo-fi chill..."
-                                    className="bg-background/50 border-transparent focus:bg-background transition-all"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Seed</label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        type="text"
-                                        value={seed}
-                                        onChange={(e) => setSeed(e.target.value)}
-                                        placeholder="Enter any text or number"
-                                        className="flex-1 font-mono bg-background/50 border-transparent focus:bg-background transition-all"
-                                    />
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={() => setSeed(Math.floor(Math.random() * 1000000))}
-                                        title="Randomize Seed (Number)"
-                                        className="bg-background/50 border-transparent hover:bg-background"
-                                    >
-                                        <Dice5 className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
+                {/* Seed Input - Always Visible */}
+                <div className="space-y-2 px-10">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Seed</label>
+                    <div className="flex gap-2 mt-3">
+                        <Input
+                            type="text"
+                            value={seed}
+                            onChange={(e) => setSeed(e.target.value)}
+                            placeholder="Enter any text or number"
+                            className="flex-1 font-mono bg-background/50 border-transparent focus:bg-background transition-all"
+                        />
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setSeed(Math.floor(Math.random() * 1000000))}
+                            title="Randomize Seed (Number)"
+                            className="bg-background/50 border-transparent hover:bg-background"
+                        >
+                            <Dice5 className="w-4 h-4" />
+                        </Button>
                     </div>
                 </div>
 
