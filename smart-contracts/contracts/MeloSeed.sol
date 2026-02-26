@@ -12,7 +12,7 @@ contract MeloSeed is ERC1155, ERC1155Burnable, Ownable {
     uint256 private _nextTokenId;
 
     struct TokenData {
-        uint256 seed;
+        string seed;
         string metadataUri;
     }
 
@@ -26,7 +26,7 @@ contract MeloSeed is ERC1155, ERC1155Burnable, Ownable {
     function mint(
         address account,
         uint256 amount,
-        uint256 seed,
+        string memory seed,
         string memory metadataUri,
         bytes memory data
     ) public {
@@ -35,11 +35,11 @@ contract MeloSeed is ERC1155, ERC1155Burnable, Ownable {
         _setTokenData(tokenId, seed, metadataUri);
     }
 
-    function _setTokenData(uint256 tokenId, uint256 seed, string memory metadataUri) internal {
+    function _setTokenData(uint256 tokenId, string memory seed, string memory metadataUri) internal {
         _tokenData[tokenId] = TokenData(seed, metadataUri);
     }
 
-    function getTokenData(uint256 tokenId) public view returns (uint256 seed, string memory metadataUri) {
+    function getTokenData(uint256 tokenId) public view returns (string memory seed, string memory metadataUri) {
         TokenData memory data = _tokenData[tokenId];
         return (data.seed, data.metadataUri);
     }

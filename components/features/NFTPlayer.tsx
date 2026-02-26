@@ -50,7 +50,7 @@ interface StyleMixItem {
 
 /** 从链上读取的 NFT 数据 */
 interface NFTData {
-  seed: number;
+  seed: string;
   metadataUri: string;
   parsedMetadata?: {
     name: string;
@@ -195,7 +195,7 @@ export function NFTPlayer({ collectionIds = [], previewData, className, onBurn }
       setTimeout(() => reject(new Error('Timeout')), timeoutDuration);
     });
 
-    const data = await Promise.race([fetchPromise, timeoutPromise]) as [bigint, string];
+    const data = await Promise.race([fetchPromise, timeoutPromise]) as [string, string];
     
     // 解析元数据
     let parsedMetadata = undefined;

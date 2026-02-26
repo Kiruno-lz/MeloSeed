@@ -42,7 +42,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 /** 完整的音乐数据结构 */
 interface CompleteMusicData {
-  seed: number;
+  seed: string;
   audioBase64?: string;
   title: string;
   description: string;
@@ -455,7 +455,7 @@ export default function Home() {
         address: CONTRACT_ADDRESS,
         abi: MELO_SEED_ABI,
         functionName: 'mint',
-        args: [address, BigInt(1), BigInt(generatedData.seed), metadataUri, "0x"],
+        args: [address, BigInt(1), generatedData.seed, metadataUri, "0x"],
       });
     } catch (e) {
       showToast("Minting failed: " + (e as Error).message, 'error');
@@ -493,7 +493,7 @@ export default function Home() {
                     <StreamingPlayer 
                       coverUrl={coverUrl}
                       title={title || `MeloSeed #${generatedData.seed}`}
-                      seed={generatedData.seed}
+                      seed={Number(generatedData.seed)}
                       seedHash={generatedData.seedHash}
                       styleMix={generatedData.styleMix}
                       className="sticky top-24"
